@@ -1,0 +1,135 @@
+"""mce — Minecraft auto-editor CLI.
+
+  mce analyze <video> [--out DIR] [--mic N] [--game N] [--layout auto|none|facecam_left|facecam_right]
+  mce moment <analysis-dir> <seconds>...      contact sheet around given moments
+  mce export <edit_plan.json> [-o out.xml]    Premiere-ready FCP7 XML
+"""
+import argparse
+import json
+import time
+from pathlib import Path
+
+from . import audio, fcpxml, sheets, timeline, vision
+from .probe import probe
+
+
+def _log(msg: str) -> None:
+    print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def _save(path: Path, data) -> None:
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+
+
+def analyze(args) -> None:
+    src = str(Path(args.video).resolve())
+    out = Path(args.out or Path(src).with_suffix("").as_posix() + "_analysis")
+    out.mkdir(parents=True, exist_ok=True)
+    info = probe(src)
+    _log(f"{info.width}x{info.height} @ {info.fps_float:.2f}fps, {sheets.fmt(info.duration)}, "
+         f"{len(info.audio_streams)} audio streams")
+
+    layout = args.layout
+    if layout == "auto":
+        layout = vision.detect_layout(src, info.width, info.height, info.duration) if info.is_wide else "none"
+    _log(f"layout: {layout}")
+
+    mic_i = args.mic
+    game_i = args.game if args.game is not None else (1 if len(info.audio_streams) > 1 else None)
+    (out / "audio").mkdir(exist_ok=True)
+    mic_wav = out / "audio" / "mic.wav"
+    audio.extract(src, mic_i, str(mic_wav))
+    mic_db = audio.envelope(audio.load(str(mic_wav)))
+    speech = audio.speech_segments(mic_db)
+    excite = audio.excitement(mic_db, speech)
+    game = []
+    if game_i is not None:
+        game_wav = out / "audio" / "game.wav"
+        audio.extract(src, game_i, str(game_wav))
+        game = audio.game_events(audio.envelope(audio.load(str(game_wav))))
+    _log(f"audio: {len(speech)} speech segments, {len(excite)} excited, {len(game)} game spikes")
+    from . import events
+    sounds = events.detect(str(mic_wav), groups=["laugh", "scream", "gasp"])
+    if game_i is not None:
+        sounds += events.detect(str(out / "audio" / "game.wav"), groups=["explosion"])
+    _log(f"sound events: " + ", ".join(f"{k} {sum(e['kind'] == k for e in sounds)}"
+                                        for k in ("laugh", "scream", "gasp", "explosion")))
+
+    seg_path = out / "transcript.json"
+    if seg_path.exists() and not args.retranscribe:
+        segments = json.loads(seg_path.read_text())
+        _log("transcript: cached")
+    else:
+        _log("transcribing (Hebrew)…")
+        from .transcribe import DEFAULT_PROMPT, transcribe
+        vocab = Path(__file__).parent.parent / "vocab.txt"
+        extra = vocab.read_text().strip().replace("\n", ", ") if vocab.exists() else ""
+        prompt = DEFAULT_PROMPT + (", " + extra if extra else "")
+        segments = transcribe(str(mic_wav), prompt=prompt)
+        _save(seg_path, segments)
+    _log(f"transcript: {len(segments)} segments")
+
+    _log("scanning gameplay picture…")
+    samples = vision.scan(src, info.width, info.height, layout, out / "thumbs")
+    _save(out / "vision.json", samples)
+
+    tl = timeline.build(info.duration, speech, excite, game, segments, samples, sounds)
+    tl.update({"source": src, "layout": layout, "fps": info.fps_float,
+               "audio": {"mic": mic_i, "game": game_i}, "width": info.width, "height": info.height})
+    _save(out / "timeline.json", tl)
+    (out / "timeline.md").write_text(timeline.to_markdown(tl, segments, samples))
+    (out / "transcript.md").write_text("\n".join(
+        f"[{sheets.fmt(s['start'])}] {s['text']}" for s in segments) + "\n")
+
+    sheets.overview(out / "thumbs", info.duration, out / "sheets")
+    for h in sorted(tl["highlights"], key=lambda h: -h["score"])[:20]:
+        sheets.moment(out / "thumbs", h["t"], info.duration, out / "sheets")
+    _log(f"done → {out}")
+
+
+def moment(args) -> None:
+    out = Path(args.dir)
+    tl = json.loads((out / "timeline.json").read_text())
+    for t in args.seconds:
+        print(sheets.moment(out / "thumbs", float(t), tl["duration"], out / "sheets"))
+
+
+def export(args) -> None:
+    plan_path = Path(args.plan)
+    plan = json.loads(plan_path.read_text())
+    info = probe(plan["source"])
+    xml = fcpxml.build(plan, info)
+    dest = Path(args.output or plan_path.with_suffix(".xml"))
+    dest.write_text(xml)
+    print(dest)
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(prog="mce")
+    sub = p.add_subparsers(required=True)
+
+    a = sub.add_parser("analyze")
+    a.add_argument("video")
+    a.add_argument("--out")
+    a.add_argument("--mic", type=int, default=0, help="audio stream index of the mic (0-based)")
+    a.add_argument("--game", type=int, help="audio stream index of game sound")
+    a.add_argument("--layout", default="auto", choices=["auto", "none", "facecam_left", "facecam_right"])
+    a.add_argument("--retranscribe", action="store_true")
+    a.set_defaults(fn=analyze)
+
+    m = sub.add_parser("moment")
+    m.add_argument("dir")
+    m.add_argument("seconds", nargs="+")
+    m.set_defaults(fn=moment)
+
+    e = sub.add_parser("export")
+    e.add_argument("plan")
+    e.add_argument("-o", "--output")
+    e.set_defaults(fn=export)
+
+    args = p.parse_args()
+    args.fn(args)
+
+
+if __name__ == "__main__":
+    main()

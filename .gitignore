@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+node_modules/
+.DS_Store
+# personal: each person keeps their own
+style.md
+vocab.txt
+# media and outputs never go in the repo
+remotion/public/*
+!remotion/public/.gitkeep
+remotion/out/
+*.mp4
+*.mov
+*.wav
+*.mp3
+*_analysis/
+test/

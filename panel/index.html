@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP for Adobe Premiere Pro</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <!-- Status: the one thing you check at a glance -->
+    <section class="status" role="status" aria-live="polite" aria-atomic="true">
+      <div class="status-dot waiting" id="statusDot" aria-hidden="true"></div>
+      <div class="status-copy">
+        <strong id="statusText">Starting connector…</strong>
+        <span id="statusDetail">Checking Premiere Pro</span>
+      </div>
+      <div class="cmd-count" title="Commands handled this session">
+        <strong id="cmdCount">0</strong>
+        <span>cmds</span>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="btnStart" class="btn btn-primary" onclick="startBridge()" type="button" aria-controls="log">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5-7-4.5Z"/></svg>
+        Start
+      </button>
+      <button id="btnStop" class="btn" onclick="stopBridge()" type="button" aria-controls="log" disabled>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1"/></svg>
+        Stop
+      </button>
+    </div>
+
+    <section class="card">
+      <header class="card-head">
+        <h2 id="connectionCenterTitle">Ready to edit</h2>
+        <button class="icon-btn" type="button" onclick="refreshConnectionCenter()" aria-controls="connectionChecks" title="Refresh checks" aria-label="Refresh checks">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.46-3.54M13 3v2.5h-2.5"/></svg>
+        </button>
+      </header>
+      <ul class="checks" id="connectionChecks" aria-labelledby="connectionCenterTitle">
+        <li id="checkConnector" data-state="waiting"><span class="check-dot" aria-hidden="true"></span><strong>Connector</strong><small>Starting…</small></li>
+        <li id="checkProject" data-state="waiting"><span class="check-dot" aria-hidden="true"></span><strong>Project</strong><small>Checking…</small></li>
+        <li id="checkSequence" data-state="waiting"><span class="check-dot" aria-hidden="true"></span><strong>Sequence</strong><small>Checking…</small></li>
+      </ul>
+    </section>
+
+    <section class="activity">
+      <header class="card-head">
+        <h2>Activity</h2>
+      </header>
+      <div id="log" role="log" aria-live="polite" aria-relevant="additions" tabindex="0" aria-label="Bridge activity log"></div>
+    </section>
+
+    <details class="settings">
+      <summary>
+        <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg>
+        Settings
+        <span class="version" id="updateTitle">Version 1.24.0</span>
+      </summary>
+
+      <div class="settings-body">
+        <label class="field-label" for="tempDir">Bridge directory</label>
+        <div class="field-row">
+          <input type="text" id="tempDir" value="" spellcheck="false" autocomplete="off" aria-describedby="tempDirHelp">
+          <button class="btn btn-small" id="btnSave" onclick="saveTempDir()" type="button">Save</button>
+        </div>
+        <p class="help" id="tempDirHelp">Commands and responses are exchanged through this local folder.</p>
+
+        <div class="update">
+          <span id="updateDetail" class="help">Checking for updates…</span>
+          <button id="btnUpdate" class="btn btn-small" onclick="handleUpdateClick()" type="button" aria-describedby="updateDetail" disabled>Check again</button>
+        </div>
+
+        <p class="help">This CEP connector doesn't use a UXP token. The UXP token field in Claude Desktop is only for <em>Window → UXP Plugins</em>.</p>
+      </div>
+    </details>
+  </main>
+
+  <script src="CSInterface.js"></script>
+  <script src="updater.cjs"></script>
+  <script src="bridge-directory-security.cjs"></script>
+  <script src="main.js"></script>
+</body>
+</html>
