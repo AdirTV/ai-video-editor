@@ -9,7 +9,7 @@ from pathlib import Path
 
 HOME = Path.home()
 REPO = Path(__file__).resolve().parent.parent
-SKILLS = ["minecraft-edit", "sfx"]
+SKILLS = ["video-edit", "minecraft-edit", "sfx"]
 
 REPLACE = [
     (str(REPO), "{{MCE_HOME}}"),

@@ -1,6 +1,7 @@
 import { loadFont } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { popOpacity, popScale } from "../pop";
+import { dir } from "../lang";
 
 const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew", "latin"] });
 
@@ -17,7 +18,7 @@ export const Sticker: React.FC<{ seconds?: number; text: string; bg: string; col
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: top }}>
       <div
         style={{
-          fontFamily, fontWeight: 900, fontSize: size, color, background: bg, direction: "rtl",
+          fontFamily, fontWeight: 900, fontSize: size, color, background: bg, direction: dir(text),
           padding: `${size * 0.12}px ${size * 0.45}px ${size * 0.2}px`,
           border: "10px solid #111", borderRadius: 18, boxShadow: "0 16px 0 #111",
           rotate: `${wob}deg`,

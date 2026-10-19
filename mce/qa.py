@@ -15,6 +15,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from .i18n import t
 
 TARGET_LUFS, MAX_TP = -14.0, -1.0
 
@@ -34,11 +35,11 @@ def check_render(path: str) -> list[str]:
     black = _ranges(_ff(["-i", path, "-vf", "blackdetect=d=0.08:pix_th=0.08", "-an", "-f", "null", "-"]),
                     "black_start", "black_end")
     for s, e in black:
-        issues.append(f"🔴 מסך שחור {s:.2f}–{e:.2f}s")
+        issues.append(t("black", s=s, e=e))
     freeze = _ranges(_ff(["-i", path, "-vf", "freezedetect=n=0.002:d=0.6", "-an", "-f", "null", "-"]),
                      r"lavfi.freezedetect.freeze_start", r"lavfi.freezedetect.freeze_end")
     for s, e in freeze:
-        issues.append(f"🟡 תמונה קפואה {s:.2f}–{e:.2f}s (בסדר אם זה מכוון)")
+        issues.append(t("freeze", s=s, e=e))
 
     loud = _ff(["-i", path, "-af", "ebur128=peak=true", "-vn", "-f", "null", "-"])
     lufs = re.findall(r"I:\s*(-?[\d.]+) LUFS", loud)
@@ -46,15 +47,15 @@ def check_render(path: str) -> list[str]:
     if lufs:
         i = float(lufs[-1])
         mark = "✅" if abs(i - TARGET_LUFS) <= 1.5 else "🟡"
-        issues.append(f"{mark} עוצמה כוללת {i:.1f} LUFS (יעד יוטיוב {TARGET_LUFS:.0f})")
+        issues.append(t("lufs", mark=mark, i=i, target=TARGET_LUFS))
     if tp:
         p = float(tp[-1])
-        issues.append(f"{'✅' if p <= MAX_TP else '🔴'} שיא {p:.1f} dBTP (מקסימום {MAX_TP:.0f})")
+        issues.append(t("peak", mark='✅' if p <= MAX_TP else '🔴', p=p, max=MAX_TP))
 
     silence = _ranges(_ff(["-i", path, "-af", "silencedetect=n=-45dB:d=0.7", "-vn", "-f", "null", "-"]),
                       "silence_start", "silence_end")
     for s, e in silence:
-        issues.append(f"🟡 שקט מוחלט {s:.2f}–{e:.2f}s")
+        issues.append(t("silence", s=s, e=e))
     return issues
 
 
@@ -64,19 +65,19 @@ def check_spec(spec: dict) -> list[str]:
     end = 0.0
     for c in v1:
         if c["start"] - end > 0.02:
-            issues.append(f"🔴 חור ב-V1 בין {end:.2f} ל-{c['start']:.2f}s")
+            issues.append(t("v1_gap", a=end, b=c["start"]))
         end = max(end, c["start"] + (c["out"] - c["in"]) / (c.get("speed") or 1))
-    for t, track in enumerate(spec.get("video", []), 1):
+    for t_i, track in enumerate(spec.get("video", []), 1):
         for c in track:
             d = (c["out"] - c["in"]) / (c.get("speed") or 1)
             if d < 0.25 and "SFX" not in c.get("name", ""):
-                issues.append(f"🟡 קליפ קצר מאוד ({d:.2f}s) ב-V{t}: {c.get('name')} @ {c['start']:.2f}")
+                issues.append(t("short_clip", d=d, t=t_i, name=c.get("name"), start=c["start"]))
     # Overlays above V3 that overlap in time compete for attention.
-    over = sorted([c for tr in spec.get("video", [])[3:] for c in tr if c.get("name") != "כתוביות"],
+    over = sorted([c for tr in spec.get("video", [])[3:] for c in tr if c.get("name") not in ("כתוביות", "Captions")],
                   key=lambda c: c["start"])
     for a, b in zip(over, over[1:]):
         if a["start"] + a["out"] - a["in"] > b["start"] + 0.05:
-            issues.append(f"🟡 שתי גרפיקות חופפות: {a.get('name')} ו-{b.get('name')} @ {b['start']:.2f}")
+            issues.append(t("overlap", a=a.get("name"), b=b.get("name"), t=b["start"]))
     return issues
 
 
@@ -110,7 +111,7 @@ def main() -> None:
     issues = check_render(a.render)
     if a.spec:
         issues += check_spec(json.loads(Path(a.spec).read_text()))
-    print("\n".join(issues) or "✅ לא נמצאו בעיות")
+    print("\n".join(issues) or t("no_issues"))
     if a.sheets:
         for p in sheets(a.render, Path(a.sheets)):
             print(p)

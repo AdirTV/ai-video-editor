@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from .premiere import Client
+from .i18n import t
 
 
 def _at(spec: dict, t: float, kind: str) -> list[str]:
@@ -44,7 +45,7 @@ def read_notes(spec_path: str) -> list[dict]:
         if (round(t, 1), m.get("comments", "")) in own:
             continue
         near = [f"{tr['name']} @ {tr['t']}" for tr in spec.get("transitions", []) if abs(tr["t"] - t) < 0.3]
-        notes.append({"t": round(t, 2), "note": text or "(בלי טקסט)", "color": m.get("colorIndex", m.get("color")),
+        notes.append({"t": round(t, 2), "note": text or t("empty_note"), "color": m.get("colorIndex", m.get("color")),
                       "video": _at(spec, t, "video"), "audio": _at(spec, t, "audio"), "transitions": near})
     return sorted(notes, key=lambda n: n["t"])
 
@@ -52,7 +53,7 @@ def read_notes(spec_path: str) -> list[dict]:
 def main() -> None:
     notes = read_notes(sys.argv[1])
     if not notes:
-        print("אין הערות חדשות על הרצף.")
+        print(t("no_notes"))
     for n in notes:
         print(f"\n[{n['t']:.2f}s] {n['note']}")
         for line in n["video"] + n["transitions"] + n["audio"]:

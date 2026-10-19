@@ -1,5 +1,6 @@
 import { loadFont } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { dir } from "./lang";
 
 const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew"] });
 
@@ -15,7 +16,7 @@ export const CTA: React.FC<{ label: string; accent: string }> = ({ label, accent
       <div
         style={{
           fontFamily,
-          direction: "rtl",
+          direction: dir(label),
           fontSize: 92,
           fontWeight: 900,
           color: "#1b1b1b",

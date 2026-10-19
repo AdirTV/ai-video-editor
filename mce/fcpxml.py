@@ -5,7 +5,7 @@ layout, separate mic/game audio tracks and comment markers.
 Edit plan (JSON):
 {
   "source": "/abs/path/recording.mp4",
-  "name": "מיינקראפט אבל ...",
+  "name": "My edit",
   "layout": "facecam_left" | "facecam_right" | "none",
   "cam": {"scale": 30, "x": 1592, "y": 878},      # facecam box: % scale, center in sequence px
   "audio": {"mic": 0, "game": 1},                  # audio stream indices in the source
@@ -26,10 +26,15 @@ from .probe import MediaInfo
 
 SEQ_W, SEQ_H = 1920, 1080
 CAM_DEFAULT = {"scale": 30, "x": 1592, "y": 878}
-MARKER_LABELS = {
-    "fix": "🔴 לתקן", "broll": "🟡 B-ROLL", "fx": "🟣 אפקט", "graphic": "🔵 גרפיקה",
-    "highlight": "🟢 רגע חזק", "chapter": "📍 פרק", "music": "🎵 מוזיקה", "note": "📝",
-}
+class _Labels(dict):
+    """Marker names in the current language (see i18n)."""
+
+    def get(self, k, default=None):
+        from .i18n import MSG, t
+        return t("mk_" + k) if "mk_" + k in MSG else default
+
+
+MARKER_LABELS = _Labels()
 
 
 def _rate(info: MediaInfo) -> str:

@@ -16,6 +16,8 @@ import json
 
 import numpy as np
 
+from .i18n import t
+
 SR = 22050
 HOP = 512
 
@@ -131,8 +133,7 @@ def fit(info: dict, duration: float, hit: float | None = None, end: str = "fade"
         later = [b for b in info["bars"] if b >= max(ideal, info["first_sound"] - 0.05)]
         s = later[0] if later else max(ideal, 0.0)
         return {"offset": round(s, 3), "timeline_start": round(s - ideal, 3), "end": "natural",
-                "reason": f"הסוף הטבעי של השיר ({info['last_sound']:.2f}s) נוחת על סוף הסרטון; "
-                          f"מתחיל על תחילת תיבה ({s:.2f}s בשיר)"}
+                "reason": t("m_natural", end=info["last_sound"], s=s)}
     bars, energy, dur = info["bars"], info["bar_energy"], info["duration"]
     starts = [b for b in bars if b + duration <= dur - 0.5] or [info["first_sound"]]
 
@@ -162,12 +163,10 @@ def fit(info: dict, duration: float, hit: float | None = None, end: str = "fade"
         if best:
             _, s, d, delay = best
             return {"offset": round(s, 3), "timeline_start": round(delay, 3), "drop_at": round(hit, 3),
-                    "reason": f"הדרופ ב-{d:.2f}s של השיר נוחת בדיוק ב-{hit:.2f}s בסרטון; השיר מתחיל על תחילת "
-                              f"תיבה ({s:.2f}s בשיר){f', {delay:.2f}s אחרי תחילת הסרטון' if delay > 0.01 else ''}"}
+                    "reason": t("m_drop", d=d, hit=hit, s=s, late=t("m_late", delay=delay) if delay > 0.01 else "")}
     # No drop target: the most energetic bar-aligned window with no real break.
     s = max(starts, key=lambda b: mean_energy(b) + 0.5 * min_energy(b))
-    return {"offset": round(s, 3), "timeline_start": 0.0, "reason": f"הקטע הכי אנרגטי בלי הפסקה (אנרגיה ממוצעת {mean_energy(s):.2f}); "
-                                             f"מתחיל על תחילת תיבה, אחרי {info['first_sound']:.2f}s של פתיחה שקטה"}
+    return {"offset": round(s, 3), "timeline_start": 0.0, "reason": t("m_energy", e=mean_energy(s), first=info["first_sound"])}
 
 
 def plot(info: dict, out: str) -> None:
@@ -292,7 +291,7 @@ def apply_playlist(spec: dict, songs: list[dict], xfade: float | None = None, ba
             target = song.get("hit", fin)
             r = fit(info, win, target) if info["drops"] else {
                 "offset": round(max(info["first_sound"], info["main_start"] - target), 3), "timeline_start": 0.0,
-                "reason": f"השיר 'נכנס' ({info['main_start']:.2f}s בשיר) בדיוק בסוף המעבר"}
+                "reason": t("m_enters", t=info["main_start"])}
         start = a + r["timeline_start"]
         length = b_out - start
         if prev is not None:  # finish fading up exactly when the outgoing song is gone
@@ -302,8 +301,8 @@ def apply_playlist(spec: dict, songs: list[dict], xfade: float | None = None, ba
                 "out": round(r["offset"] + length, 3), "gain_db": base_db, "stream": 1,
                 "name": f"Music {i + 1}", "gain_keys": _fade_keys(length, base_db, fin, fout)}
         lanes[i % 2].append(clip)
-        report.append(f"שיר {i + 1} ({song['file']}): {start:.2f}–{b_out:.2f}s, מהשנייה {r['offset']:.2f} בשיר"
-                      + (f", נכנס בקרוס-פייד של {fin:.2f}s" if prev else "") + f" — {r['reason']}")
+        report.append(t("m_song", n=i + 1, file=song["file"], a=start, b=b_out, off=r["offset"])
+                      + (t("m_xfade", x=fin) if prev else "") + f" — {r['reason']}")
         prev = None if last else (song["until"], xf_out)
     spec["audio"] += [lane for lane in lanes if lane]
     return report

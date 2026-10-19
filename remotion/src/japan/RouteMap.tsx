@@ -1,5 +1,6 @@
 import { loadFont } from "@remotion/google-fonts/Heebo";
 import { AbsoluteFill, Easing, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { dir } from "../lang";
 
 const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew", "latin"] });
 
@@ -51,7 +52,7 @@ export const RouteMap: React.FC<{ seconds?: number; stops: Stop[]; upTo?: number
                 display: "flex", flexDirection: "column", alignItems: "center", opacity: shown ? 1 : 0, scale: `${i <= fromLeg ? 1 : pop}` }}>
                 <Img src={staticFile(`japan/${s.icon ?? (isLast ? "Map_X.png" : "Map_Marker.png")}`)}
                   style={{ width: size * 0.075, height: size * 0.075, imageRendering: "pixelated" }} />
-                <div style={{ fontFamily, fontWeight: 900, fontSize: size * 0.04, color: "#3b2a17", direction: "rtl", whiteSpace: "nowrap",
+                <div style={{ fontFamily, fontWeight: 900, fontSize: size * 0.04, color: "#3b2a17", direction: dir(s.label), whiteSpace: "nowrap",
                   background: "rgba(255,248,225,.85)", padding: "0 10px", borderRadius: 6, marginTop: 4 }}>{s.label}</div>
               </div>
             );

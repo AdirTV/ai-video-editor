@@ -7,7 +7,7 @@ description: Add sound effects to a video edit — whooshes on transitions, pops
 
 Tooling: `{{MCE_HOME}}/mce/sfx.py`. Prefix shell commands with
 `{{PATH_PREFIX}}` and run from `{{MCE_HOME}}`.
-Talk to the user in Hebrew.
+Talk to the user in the language they write in.
 
 ## The library
 

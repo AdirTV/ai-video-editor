@@ -1,12 +1,13 @@
 import { loadFont } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { popOpacity } from "../pop";
+import { dir, pick, type Lang } from "../lang";
 
 const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew", "latin"] });
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 // Red alarm: pulsing red edges + a warning sign that slams in.
-export const Alarm: React.FC<{ seconds?: number; text?: string }> = ({ text = "זהירות!" }) => {
+export const Alarm: React.FC<{ seconds?: number; text?: string; lang?: Lang }> = ({ lang, text = pick(lang, "זהירות!", "Watch out!") }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const pulse = 0.55 + 0.45 * Math.abs(Math.sin((frame / fps) * Math.PI * 3));
@@ -28,7 +29,7 @@ export const Alarm: React.FC<{ seconds?: number; text?: string }> = ({ text = "�
           </svg>
           <div
             style={{
-              fontFamily, fontWeight: 900, fontSize: 120, color: "#fff", direction: "rtl", marginTop: 10,
+              fontFamily, fontWeight: 900, fontSize: 120, color: "#fff", direction: dir(text), marginTop: 10,
               WebkitTextStroke: "18px #111", paintOrder: "stroke fill", textShadow: "0 12px 0 #111",
             }}
           >

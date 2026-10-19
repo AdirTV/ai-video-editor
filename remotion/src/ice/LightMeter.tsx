@@ -1,6 +1,7 @@
 import { loadFont } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { popOpacity, popScale } from "../pop";
+import { dir, pick, type Lang } from "../lang";
 
 const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew", "latin"] });
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -18,8 +19,8 @@ const Torch: React.FC<{ size: number; glow: number }> = ({ size, glow }) => (
 );
 
 // "Light level" HUD: 15 blocks fill up, turn red at the top and the panel shakes — "too bright!".
-export const LightMeter: React.FC<{ seconds?: number; label?: string; warn?: string; fill?: number }> = ({
-  label = "רמת אור", warn = "חזק מדי!", fill = 0.9,
+export const LightMeter: React.FC<{ seconds?: number; label?: string; warn?: string; fill?: number; lang?: Lang }> = ({
+  lang, label = pick(lang, "רמת אור", "Light level"), warn = pick(lang, "חזק מדי!", "Too bright!"), fill = 0.9,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -43,7 +44,7 @@ export const LightMeter: React.FC<{ seconds?: number; label?: string; warn?: str
           display: "flex",
           alignItems: "center",
           gap: 26,
-          direction: "rtl",
+          direction: dir(label),
         }}
       >
         <Torch size={130} glow={lvl / 15} />
@@ -65,7 +66,7 @@ export const LightMeter: React.FC<{ seconds?: number; label?: string; warn?: str
         style={{
           fontFamily, fontWeight: 900, fontSize: 104, color: "#ff3b3b", marginTop: 34,
           WebkitTextStroke: "16px #111", paintOrder: "stroke fill", textShadow: "0 10px 0 #111",
-          scale: warnS, rotate: `${-4 + Math.sin(t * 20) * 2}deg`, direction: "rtl",
+          scale: warnS, rotate: `${-4 + Math.sin(t * 20) * 2}deg`, direction: dir(warn),
           opacity: popOpacity(frame, durationInFrames, 7),
         }}
       >

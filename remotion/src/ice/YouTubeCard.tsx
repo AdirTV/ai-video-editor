@@ -1,5 +1,6 @@
 import { loadFont } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { dir, pick, type Lang } from "../lang";
 
 const { fontFamily } = loadFont("normal", { weights: ["500", "700", "900"], subsets: ["hebrew", "latin"] });
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -7,8 +8,8 @@ const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 // "The full video is up": the thumbnail on a YouTube-style watch page (dark mode + ambient glow),
 // card springs in, slow push, then a finger tap on the video at `tapAt` seconds.
 export const YouTubeCard: React.FC<{
-  seconds?: number; thumb: string; title: string; channel: string; meta: string; tapAt: number;
-}> = ({ thumb, title, channel, meta, tapAt }) => {
+  seconds?: number; thumb: string; title: string; channel: string; meta: string; tapAt: number; lang?: Lang;
+}> = ({ thumb, title, channel, meta, tapAt, lang }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const src = staticFile(thumb);
@@ -43,7 +44,7 @@ export const YouTubeCard: React.FC<{
             <div style={{ width: `${prog * 100}%`, height: "100%", background: "#ff0033" }} />
           </div>
           <div style={{ position: "absolute", top: 22, right: 22, background: "#ff0033", color: "#fff", fontWeight: 900,
-            fontSize: 44, padding: "4px 22px 8px", borderRadius: 12, direction: "rtl" }}>חדש!</div>
+            fontSize: 44, padding: "4px 22px 8px", borderRadius: 12, direction: dir(title) }}>{pick(lang, "חדש!", "NEW!")}</div>
           {/* tap ripple */}
           <div style={{ position: "absolute", left: W / 2 - 160, top: H / 2 - 160, width: 320, height: 320, borderRadius: "50%",
             background: "rgba(255,255,255,.35)", scale: ripple * 1.6, opacity: ripple > 0 ? 1 - ripple : 0 }} />
@@ -55,7 +56,7 @@ export const YouTubeCard: React.FC<{
           </svg>
         </div>
         {/* title + channel */}
-        <div style={{ position: "absolute", left: X + 10, right: X + 10, top: Y + H + 34, direction: "rtl", color: "#f1f1f1" }}>
+        <div style={{ position: "absolute", left: X + 10, right: X + 10, top: Y + H + 34, direction: dir(title), color: "#f1f1f1" }}>
           <div style={{ fontSize: 52, fontWeight: 700, lineHeight: 1.25 }}>{title}</div>
           <div style={{ fontSize: 34, color: "#aaa", marginTop: 12, fontWeight: 500 }}>{meta}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 30 }}>

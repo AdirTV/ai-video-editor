@@ -2,6 +2,7 @@ import { loadFont as loadHeebo } from "@remotion/google-fonts/Heebo";
 import { loadFont as loadRubik } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import { popOpacity, popScale } from "../pop";
+import { dir } from "../lang";
 
 const FONTS = {
   rubik: loadRubik("normal", { weights: ["900"], subsets: ["hebrew", "latin"] }).fontFamily,
@@ -23,7 +24,7 @@ const Word: React.FC<{ cap: Cap; frames: number; size: number; font: Font }> = (
         lineHeight: 1.05,
         textAlign: "center",
         whiteSpace: "nowrap",
-        direction: "rtl",
+        direction: dir(cap.text),
         unicodeBidi: "plaintext",
         color: "white",
         WebkitTextStroke: `${Math.round(size * 0.15)}px #111`,

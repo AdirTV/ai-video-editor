@@ -3,6 +3,8 @@
 Read from ~/.mce/config.json (written by the installer), overridable with env vars:
   editing_root  MCE_EDITING_ROOT  where projects live      (default ~/Desktop/editing)
   sfx_lib       MCE_SFX_LIB       sound-effects library    (default <editing_root>/SFX)
+  language      MCE_LANGUAGE      "he" | "en" | "auto"     (default auto: detected from the audio)
+  profile       MCE_PROFILE       "general" | "minecraft"  (default general; minecraft adds HUD detection)
 """
 import json
 import os
@@ -14,6 +16,8 @@ _cfg_path = Path.home() / ".mce" / "config.json"
 _cfg = json.loads(_cfg_path.read_text()) if _cfg_path.exists() else {}
 
 EDITING_ROOT = Path(os.environ.get("MCE_EDITING_ROOT") or _cfg.get("editing_root") or Path.home() / "Desktop" / "editing").expanduser()
+LANGUAGE = (os.environ.get("MCE_LANGUAGE") or _cfg.get("language") or "auto").lower()
+PROFILE = (os.environ.get("MCE_PROFILE") or _cfg.get("profile") or "general").lower()
 SFX_LIB = Path(os.environ.get("MCE_SFX_LIB") or _cfg.get("sfx_lib") or EDITING_ROOT / "SFX").expanduser()
 
 

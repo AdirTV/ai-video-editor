@@ -12,6 +12,7 @@ import { YouDied } from "./ice/YouDied";
 import { YouTubeCard } from "./ice/YouTubeCard";
 import { Advancement } from "./japan/Advancement";
 import { RouteMap } from "./japan/RouteMap";
+import { SpeedrunTimer } from "./japan/SpeedrunTimer";
 
 // duration from a "seconds" prop
 const bySeconds = ({ props }: { props: { seconds?: number } }) => ({ durationInFrames: Math.ceil((props.seconds ?? 1) * 60) });
@@ -55,6 +56,12 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{ seconds: 5, size: 900, stops: [
           { x: 0.15, y: 0.2, label: "המלון" }, { x: 0.35, y: 0.45, label: "מטרו", icon: "Minecart.png" },
           { x: 0.62, y: 0.55, label: "מונורייל", icon: "Minecart.png" }, { x: 0.82, y: 0.82, label: "חנות מיינקראפט" } ] }}
+        calculateMetadata={bySeconds} />
+      <Composition id="SpeedrunTimer" component={SpeedrunTimer} fps={FPS} width={1920} height={1080} durationInFrames={60}
+        defaultProps={{ seconds: 6, from: 0, to: 3083, scale: 0.9, splits: [
+          { label: "יציאה מהמלון", at: 0 }, { label: "לוסון", at: 134 }, { label: "מטרו", at: 422 },
+          { label: "מונורייל", at: 1125 }, { label: "אודאיבה", at: 2563 }, { label: "דייברסיטי", at: 2903 },
+          { label: "חנות מיינקראפט", at: 3083 } ] }}
         calculateMetadata={bySeconds} />
     </>
   );

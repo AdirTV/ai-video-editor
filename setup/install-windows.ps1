@@ -1,7 +1,7 @@
 # AI video editor for Premiere — one-shot installer for Windows (PowerShell).
-# Run from the repo:  powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1 [-EditingRoot PATH] [-Yes]
+# Run from the repo:  powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1 [-EditingRoot PATH] [-Language he|en|auto] [-Yes]
 #   -Yes  never prompt (for an AI assistant running the install).
-param([string]$EditingRoot = "", [switch]$Yes)
+param([string]$EditingRoot = "", [string]$Language = "auto", [switch]$Yes)
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 $Repo = (Get-Location).Path
@@ -35,9 +35,9 @@ $Er = $EditingRoot
 if (-not $Er -and -not $Yes) { $Er = Read-Host "Where do you keep your editing projects? [$env:USERPROFILE\Desktop\editing]" }
 if (-not $Er) { $Er = "$env:USERPROFILE\Desktop\editing" }
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.mce" | Out-Null
-@{ editing_root = $Er; sfx_lib = (Join-Path $Er "SFX") } | ConvertTo-Json | Set-Content -Encoding UTF8 "$env:USERPROFILE\.mce\config.json"
+@{ editing_root = $Er; sfx_lib = (Join-Path $Er "SFX"); language = $Language; profile = "general" } | ConvertTo-Json | Set-Content -Encoding UTF8 "$env:USERPROFILE\.mce\config.json"
 foreach ($k in "whoosh","pop","riser","impact","ding","click","magic","glitch","minecraft") { New-Item -ItemType Directory -Force (Join-Path $Er "SFX\$k") | Out-Null }
-if (-not (Test-Path style.md)) { Copy-Item style.template.md style.md }
+if (-not (Test-Path style.md)) { if ($Language -eq "en") { Copy-Item style.template.en.md style.md } else { Copy-Item style.template.md style.md } }
 if (-not (Test-Path vocab.txt)) { New-Item vocab.txt | Out-Null }
 
 Step "6/8 Skills"

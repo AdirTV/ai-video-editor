@@ -1,4 +1,4 @@
-"""mce — Minecraft auto-editor CLI.
+"""mce — AI auto-editor CLI (any footage: gameplay, vlogs, talking head, podcasts).
 
   mce analyze <video> [--out DIR] [--mic N] [--game N] [--layout auto|none|facecam_left|facecam_right]
   mce moment <analysis-dir> <seconds>...      contact sheet around given moments
@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from . import audio, fcpxml, sheets, timeline, vision
+from .config import LANGUAGE, PROFILE
 from .probe import probe
 
 
@@ -60,17 +61,27 @@ def analyze(args) -> None:
         segments = json.loads(seg_path.read_text())
         _log("transcript: cached")
     else:
-        _log("transcribing (Hebrew)…")
-        from .transcribe import DEFAULT_PROMPT, transcribe
+        from . import transcribe as tr
+        lang = args.language
+        _log(f"transcribing ({lang})…")
         vocab = Path(__file__).parent.parent / "vocab.txt"
         extra = vocab.read_text().strip().replace("\n", ", ") if vocab.exists() else ""
-        prompt = DEFAULT_PROMPT + (", " + extra if extra else "")
-        segments = transcribe(str(mic_wav), prompt=prompt)
+        base = tr.PROMPTS.get((args.profile, lang), "") if lang != "auto" else ""
+        prompt = ", ".join(x for x in (base, extra) if x) or None
+        segments = tr.transcribe(str(mic_wav), prompt=prompt, language=lang)
         _save(seg_path, segments)
+        _log(f"language: {tr.LAST_LANGUAGE}")
+    # Reports and labels follow the language actually spoken.
+    from .i18n import guess, set_lang
+    set_lang(guess(" ".join(s["text"] for s in segments)) if segments else args.language)
     _log(f"transcript: {len(segments)} segments")
 
-    _log("scanning gameplay picture…")
+    _log("scanning picture…")
     samples = vision.scan(src, info.width, info.height, layout, out / "thumbs")
+    if args.profile != "minecraft":
+        # HUD detectors (hearts, inventory panels, death screen) only mean something in Minecraft.
+        for smp in samples:
+            smp.update(heart_px=0, menu=0.0, redness=1.0, health=None)
     _save(out / "vision.json", samples)
 
     tl = timeline.build(info.duration, speech, excite, game, segments, samples, sounds)
@@ -115,6 +126,9 @@ def main() -> None:
     a.add_argument("--game", type=int, help="audio stream index of game sound")
     a.add_argument("--layout", default="auto", choices=["auto", "none", "facecam_left", "facecam_right"])
     a.add_argument("--retranscribe", action="store_true")
+    a.add_argument("--language", default=LANGUAGE, help="he | en | auto (default from ~/.mce/config.json)")
+    a.add_argument("--profile", default=PROFILE, choices=["general", "minecraft"],
+                   help="minecraft adds HUD detection (health, menus, death screen)")
     a.set_defaults(fn=analyze)
 
     m = sub.add_parser("moment")

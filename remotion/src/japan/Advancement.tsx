@@ -1,5 +1,6 @@
 import { loadFont } from "@remotion/google-fonts/Heebo";
 import { AbsoluteFill, Easing, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { dir, pick, type Lang } from "../lang";
 
 const { fontFamily } = loadFont("normal", { weights: ["800", "900"], subsets: ["hebrew", "latin"] });
 
@@ -10,8 +11,8 @@ const mcShadow = (px: number, c: string) => `${px}px ${px}px 0 ${c}`;
 // frame: "task" | "goal" | "challenge" (challenge = purple title, the rare one).
 export const Advancement: React.FC<{
   seconds?: number; title?: string; text: string; icon: string;
-  frame?: "task" | "goal" | "challenge"; scale?: number; top?: number; side?: "right" | "left" | "center";
-}> = ({ title, text, icon, frame: kind = "task", scale = 1, top = 60, side = "right" }) => {
+  frame?: "task" | "goal" | "challenge"; scale?: number; top?: number; side?: "right" | "left" | "center"; lang?: Lang;
+}> = ({ title, text, icon, frame: kind = "task", scale = 1, top = 60, side = "right", lang }) => {
   const f = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const inP = spring({ frame: f, fps, config: { damping: 16, stiffness: 140, mass: 0.8 } });
@@ -24,7 +25,8 @@ export const Advancement: React.FC<{
   const shine = interpolate(f, [10, 40], [-120, 220], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   const titleColor = kind === "challenge" ? "#FF55FF" : "#FFFF55";
-  const titleText = title ?? (kind === "challenge" ? "אתגר הושלם!" : kind === "goal" ? "מטרה הושגה!" : "הישג חדש!");
+  const titleText = title ?? (kind === "challenge" ? pick(lang, "אתגר הושלם!", "Challenge Complete!")
+    : kind === "goal" ? pick(lang, "מטרה הושגה!", "Goal Reached!") : pick(lang, "הישג חדש!", "Advancement Made!"));
   const frameImg = { task: "Task", goal: "Goal", challenge: "Challenge" }[kind];
   const u = 6 * scale; // one Minecraft GUI pixel
 
@@ -33,7 +35,7 @@ export const Advancement: React.FC<{
     <AbsoluteFill style={{ alignItems: justify, justifyContent: "flex-start", padding: `${top}px 60px` }}>
       <div
         style={{
-          translate: `0 ${y}px`, direction: "rtl", display: "flex", alignItems: "center", gap: 6 * u,
+          translate: `0 ${y}px`, direction: dir(text), display: "flex", alignItems: "center", gap: 6 * u,
           minWidth: 160 * u, padding: `${4 * u}px ${6 * u}px ${4 * u}px ${8 * u}px`,
           background: "#212121", position: "relative", overflow: "hidden",
           // classic GUI bevel: light outer ring, black inner ring
