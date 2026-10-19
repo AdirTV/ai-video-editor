@@ -27,14 +27,21 @@ bash setup/install-mac.sh
 ```
 הסקריפט יבקש את סיסמת המחשב (להתקנת Homebrew) ואת המיקום של תיקיית העריכות שלך.
 
-### Windows
-פותחים **PowerShell** ומריצים:
+### Windows (הכי פשוט — בלי פקודות)
+1. נכנסים לריפו ב-GitHub (מחוברים לחשבון שהוזמן) → כפתור ירוק **Code** → **Download ZIP**
+2. מחלצים את ה-ZIP לתיקייה קבועה, למשל `Documents\ai-video-editor` (לא להשאיר ב-Downloads)
+3. לחיצה כפולה על **`install-windows.bat`**
+4. מאשרים את חלונות ההרשאה שקופצים (התקנת ffmpeg, Node וכו')
+
+<details><summary>או דרך PowerShell עם git (מאפשר עדכונים ב-git pull)</summary>
+
 ```powershell
 winget install --id Git.Git -e
 git clone https://github.com/AdirTV/ai-video-editor.git $HOME\ai-video-editor
 cd $HOME\ai-video-editor
 powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1
 ```
+</details>
 
 ### אחרי ההתקנה (פעם אחת)
 1. בפעם הראשונה שמריצים `claude` — מתחברים עם חשבון Claude.

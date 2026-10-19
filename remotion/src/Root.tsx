@@ -10,6 +10,8 @@ import { LightMeter } from "./ice/LightMeter";
 import { Sticker } from "./ice/Sticker";
 import { YouDied } from "./ice/YouDied";
 import { YouTubeCard } from "./ice/YouTubeCard";
+import { Advancement } from "./japan/Advancement";
+import { RouteMap } from "./japan/RouteMap";
 
 // duration from a "seconds" prop
 const bySeconds = ({ props }: { props: { seconds?: number } }) => ({ durationInFrames: Math.ceil((props.seconds ?? 1) * 60) });
@@ -43,6 +45,17 @@ export const RemotionRoot: React.FC = () => {
       <Composition id="YouTubeCard" component={YouTubeCard} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ seconds: 4.58, thumb: "ice/thumb.png", title: "כל הדברים החדשים במיינקראפט לייב 2026!",
           channel: "אדיר טיוי", meta: "הועלה עכשיו", tapAt: 2.43 }} calculateMetadata={bySeconds} />
+      <Composition id="Advancement" component={Advancement} fps={FPS} width={1920} height={1080} durationInFrames={60}
+        defaultProps={{ seconds: 3, text: "הגעת לחנות מיינקראפט ביפן", icon: "Emerald.png", frame: "challenge" as const, scale: 1 }}
+        calculateMetadata={bySeconds} />
+      <Composition id="AdvancementV" component={Advancement} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ seconds: 3, text: "נסעת במונורייל", icon: "Minecart.png", frame: "task" as const, scale: 0.8, top: 260, side: "center" as const }}
+        calculateMetadata={bySeconds} />
+      <Composition id="RouteMap" component={RouteMap} fps={FPS} width={1920} height={1080} durationInFrames={60}
+        defaultProps={{ seconds: 5, size: 900, stops: [
+          { x: 0.15, y: 0.2, label: "המלון" }, { x: 0.35, y: 0.45, label: "מטרו", icon: "Minecart.png" },
+          { x: 0.62, y: 0.55, label: "מונורייל", icon: "Minecart.png" }, { x: 0.82, y: 0.82, label: "חנות מיינקראפט" } ] }}
+        calculateMetadata={bySeconds} />
     </>
   );
 };
