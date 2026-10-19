@@ -78,8 +78,8 @@ continuous), crossfades audio on alternating tracks, and writes `caps_props.json
 - Pick B-roll by what is said (money → cash shots, "robbing a store" → robbery…). Find shot boundaries with
   `select='gt(scene,0.3)'` so in/out never crosses a cut. Official trailers via `yt-dlp` (H.264) → CFR 60.
 - Talking-head shorts (see style.md): split 40/60 (`split_ratio`), top = a *literal* picture of what is said;
-  captions **white, one line, same size, one fixed position** (`look: "stream"`, `top` ≈1590 lower third) — Adir
-  rejected 2-line karaoke and moving captions. Keep headroom tight (`full_target_y` ≈620, `low_face_y` ≈0.30).
+  captions **white, one line, same size** (`look: "stream"`): **on the seam while the screen is split, lower third
+  (`top` ≈1460) otherwise** — never moving mid-phrase. the user rejected 2-line karaoke. Keep headroom tight (`full_target_y` ≈620, `low_face_y` ≈0.30).
   Add music (never Epidemic/Artlist — skip `ES_` files) and SFX (talkshort auto-whooshes b-roll entries; add
   content hits in `"sfx"`).
 - Always set `"project"` in the config — several Premiere projects may be open (other sessions); push opens and

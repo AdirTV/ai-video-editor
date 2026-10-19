@@ -83,8 +83,10 @@ def build(spec: dict) -> str:
         n += 1
         f = files[c["file"]]
         speed = float(c.get("speed", 1) or 1)
-        dur = max(1, round(fr(c["out"] - c["in"]) / speed))
         start = fr(c["start"])
+        # round the END time, not the length: back-to-back clips then share the exact boundary frame
+        # (rounding start and length separately left 1-frame black gaps at cuts)
+        dur = max(1, fr(c["start"] + (c["out"] - c["in"]) / speed) - start)
         cf, crate = frate(f)  # clip in/out/keyframes count source frames
         c_in = round(c["in"] * cf / speed)
         c_dur = round(dur * cf / fps)

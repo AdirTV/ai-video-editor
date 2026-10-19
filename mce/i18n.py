@@ -13,6 +13,8 @@ _lang = LANGUAGE if LANGUAGE in ("he", "en") else "en"
 MSG = {
     # qa
     "black": ("🔴 מסך שחור {s:.2f}–{e:.2f}s", "🔴 Black frames {s:.2f}–{e:.2f}s"),
+    "frame_gap": ("🔴 חור של {n} פריימים ב-V{t} ב-{at:.2f}s (פריים שחור בקאט)",
+                  "🔴 {n}-frame gap on V{t} at {at:.2f}s (black frame at a cut)"),
     "black_tail": ("🔴 פריימים שחורים בסוף ({d:.2f}s) — קליפ אודיו ארוך מהתמונה?",
                    "🔴 Black frames at the end ({d:.2f}s) — an audio clip longer than the picture?"),
     "freeze": ("🟡 תמונה קפואה {s:.2f}–{e:.2f}s (בסדר אם זה מכוון)", "🟡 Frozen picture {s:.2f}–{e:.2f}s (fine if intended)"),

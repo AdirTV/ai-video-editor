@@ -75,6 +75,15 @@ def check_spec(spec: dict) -> list[str]:
         if c["start"] - end > 0.02:
             issues.append(t("v1_gap", a=end, b=c["start"]))
         end = max(end, c["start"] + (c["out"] - c["in"]) / (c.get("speed") or 1))
+    # tiny gaps between back-to-back clips on ANY video track (1–3 frames of black, or of the track below)
+    fps = int(spec.get("fps", 60))
+    fr = lambda x: round(x * fps)
+    for t_i, track in enumerate(spec.get("video", []), 1):
+        cl = sorted(track, key=lambda c: c["start"])
+        for a, b in zip(cl, cl[1:]):
+            a_end = fr(a["start"] + (a["out"] - a["in"]) / (a.get("speed") or 1))
+            if 0 < fr(b["start"]) - a_end <= 3:
+                issues.append(t("frame_gap", n=fr(b["start"]) - a_end, t=t_i, at=a_end / fps))
     for t_i, track in enumerate(spec.get("video", []), 1):
         for c in track:
             d = (c["out"] - c["in"]) / (c.get("speed") or 1)

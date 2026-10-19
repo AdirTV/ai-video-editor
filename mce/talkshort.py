@@ -159,7 +159,7 @@ def frame_face(face: tuple[float, float, float], pct: float, target: tuple[float
     return {"scale": round(pct, 2), "x": round(x), "y": round(y)}
 
 
-def captions(cuts: list[dict], cfg: dict) -> list[dict]:
+def captions(cuts: list[dict], cfg: dict, breaks: list[float] = ()) -> list[dict]:
     fix = {k.lower(): v for k, v in cfg.get("fix", {}).items()}
     hl = cfg.get("hl", {})
     mw = cfg.get("max_words", 3)
@@ -177,11 +177,17 @@ def captions(cuts: list[dict], cfg: dict) -> list[dict]:
             txt = fix.get(_norm(raw), raw)
             ts = w["start"] - c["in"] + c["start"]
             te = min(w["end"], c["out"]) - c["in"] + c["start"]
+            at_break = any(group[0][1] < b <= ts + 0.01 for b in breaks) if group else False
             if group and (len(group) >= mw or len(" ".join(g[0] for g in group) + txt) > maxc
-                          or ts - group[-1][2] > 0.25):
+                          or ts - group[-1][2] > 0.25 or at_break):
+                carry = []
+                while not at_break and len(group) > 2 and _norm(group[-1][0]) in ("the", "a", "an"):
+                    carry.insert(0, group.pop())  # "cash and escape | the cops" -> "the" moves on
                 flush()
+                group.extend(carry)
             if (not group and raw[-1:] in ".,!?" and caps and len(txt) <= 9
-                    and ts - caps[-1]["end"] < 0.3 and caps[-1]["start"] >= c["start"]):
+                    and ts - caps[-1]["end"] < 0.3 and caps[-1]["start"] >= c["start"]
+                    and not any(caps[-1]["start"] < b <= ts + 0.01 for b in breaks)):
                 # a short sentence-final word joins the group before it ("steps ahead of you.")
                 caps[-1]["text"] += " " + txt
                 caps[-1]["end"] = round(te + 0.2, 2)
@@ -416,26 +422,35 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     # 5. captions
     cc = cfg.get("captions", {})
     look = cc.get("look", "stream")
+    cut_full = [(b["at"], b["at"] + b["dur"]) for b in brolls if b.get("full")]
+
+    def on_split(t):
+        return split and covered(t, t + 0.1) and not any(a <= t < z for a, z in cut_full)
+    marks = sorted({sh["start"] for sh in shots} | {x for ab in cut_full for x in ab})
+    breaks = [m for m in marks if m > 0 and on_split(m + 0.02) != on_split(m - 0.15)]
     if look == "karaoke":
         size = cc.get("size", 84)
         full_y = cc.get("full_y", 1300)
-        cut_full = [(b["at"], b["at"] + b["dur"]) for b in brolls if b.get("full")]
-
-        def on_split(t):
-            return split and covered(t, t + 0.1) and not any(a <= t < z for a, z in cut_full)
-        marks = sorted({sh["start"] for sh in shots} | {x for ab in cut_full for x in ab})
-        breaks = [m for m in marks if m > 0 and on_split(m + 0.02) != on_split(m - 0.15)]
         caps = phrases(cuts, cc, breaks)
         for cp in caps:  # on the seam over split shots, lower-middle over full-frame ones
             cp["y"] = seam if on_split(cp["start"] + 0.06) else full_y
         props = {"caps": caps, "size": size, "seconds": round(end, 2), "font": cc.get("font", "carlito"),
                  "look": look}
     else:
-        caps = captions(cuts, cc)
         size = cc.get("size", 92 if split else 104)
-        # one fixed position for the whole short (moving captions read as a glitch): on the seam
-        props = {"caps": caps, "top": cc.get("top", round(seam - size * 0.3) if split else 1180),
-                 "size": size, "seconds": round(end, 2), "font": cc.get("font", "carlito"), "look": look}
+        top = cc.get("top", 1460)                      # full-frame shots: lower third
+        seam_top = cc.get("seam_top", round(seam - size * 0.55))  # split shots: centred on the seam
+        caps = captions(cuts, cc, breaks if cc.get("follow_layout", True) else [])
+        for i in range(len(caps) - 2, -1, -1):  # a caption shorter than 0.3 s is a flash: join the next one
+            if caps[i]["end"] - caps[i]["start"] < 0.3 and caps[i + 1]["start"] - caps[i]["end"] < 0.1:
+                nx = caps.pop(i + 1)
+                caps[i] = {**nx, "start": caps[i]["start"], "text": caps[i]["text"] + " " + nx["text"],
+                           "hl": {**caps[i].get("hl", {}), **nx.get("hl", {})}, "_tl": nx["start"]}
+        if cc.get("follow_layout", True) and split:
+            for cp in caps:
+                cp["top"] = seam_top if on_split(cp.pop("_tl", cp["start"]) + 0.02) else top
+        props = {"caps": caps, "top": top, "size": size, "seconds": round(end, 2),
+                 "font": cc.get("font", "carlito"), "look": look}
     video = [v_face, v_broll]
     mov = cc.get("mov")
     if mov and Path(rel(mov)).exists():

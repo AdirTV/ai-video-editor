@@ -18,6 +18,7 @@ export type Cap = {
   words?: number[];  // karaoke: each word's start (s from cap start)
   big?: string[];    // karaoke: words drawn larger
   y?: number;        // karaoke: vertical centre of this caption (px)
+  top?: number;      // other looks: this caption's top (px), overrides the global top
 };
 
 // "bold": white, thick black stroke + drop (default). "stream": white (Adir's default; was light blue), thin navy outline, soft pop
@@ -134,7 +135,7 @@ export const Captions: React.FC<{
                 </div>
               </AbsoluteFill>
             ) : (
-              <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: top }}>
+              <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-start", paddingTop: c.top ?? top }}>
                 <Word cap={c} frames={frames} size={size} font={font} look={look} color={color} />
               </AbsoluteFill>
             )}

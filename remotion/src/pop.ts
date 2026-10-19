@@ -14,5 +14,9 @@ export const popScale = (frame: number, duration: number, inFrames = 9, outFrame
         easing: Easing.in(Easing.quad),
       });
 
-export const popOpacity = (frame: number, duration: number, outFrames = 6) =>
-  interpolate(frame, [0, 2, duration - outFrames * 0.5, duration], [0, 1, 1, 0], clamp);
+export const popOpacity = (frame: number, duration: number, outFrames = 6) => {
+  // keep the input range strictly increasing even for very short elements
+  const a = Math.min(2, duration * 0.25);
+  const b = Math.max(a + 0.01, duration - outFrames * 0.5);
+  return interpolate(frame, [0, a, b, Math.max(b + 0.01, duration)], [0, 1, 1, 0], clamp);
+};
