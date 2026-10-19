@@ -9,7 +9,9 @@ dump command output on them.
   a chat-only Claude without a terminal, tell the user to open Claude Code and paste the link there.
 - Ask the user two questions: **where do they keep their editing projects?** (default: `~/Desktop/editing`
   on Mac, `%USERPROFILE%\Desktop\editing` on Windows), and **which language their videos are in** —
-  Hebrew (`he`), English (`en`) or mixed/other (`auto`, detected per video). Everything else has defaults.
+  Hebrew (`he`), English (`en`) or mixed/other (`auto`, detected per video). Also ask whether they make
+  **Minecraft** videos — if not, add `--no-minecraft` (Mac) / `-NoMinecraft` (Windows) so only the general
+  editor is installed. Everything else has defaults.
 - Detect the OS (`uname` / `$env:OS`).
 
 ## 1. Get the code
@@ -34,7 +36,7 @@ from the repo page and extract it to the same place.
 The installer is long (several minutes, downloads ~2 GB of Python/Node packages). Run it in the
 background or with a long timeout and report progress per step (it prints `== n/8 ...`).
 It installs: ffmpeg, Node, uv, yt-dlp, the Premiere bridge (premiere-pro-mcp) and its panel, the Python
-and Remotion dependencies, the skills (`video-edit`, `minecraft-edit`, `sfx`, Remotion's), and registers the
+and Remotion dependencies, the skills (`video-edit`, `sfx`, Remotion's, and `minecraft-edit` unless `--no-minecraft`), and registers the
 `premiere` MCP server with Claude Code.
 
 ## 3. Verify

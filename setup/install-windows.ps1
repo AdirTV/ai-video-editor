@@ -1,7 +1,7 @@
 # AI video editor for Premiere — one-shot installer for Windows (PowerShell).
-# Run from the repo:  powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1 [-EditingRoot PATH] [-Language he|en|auto] [-Yes]
+# Run from the repo:  powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1 [-EditingRoot PATH] [-Language he|en|auto] [-NoMinecraft] [-Yes]
 #   -Yes  never prompt (for an AI assistant running the install).
-param([string]$EditingRoot = "", [string]$Language = "auto", [switch]$Yes)
+param([string]$EditingRoot = "", [string]$Language = "auto", [switch]$NoMinecraft, [switch]$Yes)
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 $Repo = (Get-Location).Path
@@ -35,13 +35,14 @@ $Er = $EditingRoot
 if (-not $Er -and -not $Yes) { $Er = Read-Host "Where do you keep your editing projects? [$env:USERPROFILE\Desktop\editing]" }
 if (-not $Er) { $Er = "$env:USERPROFILE\Desktop\editing" }
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.mce" | Out-Null
-@{ editing_root = $Er; sfx_lib = (Join-Path $Er "SFX"); language = $Language; profile = "general" } | ConvertTo-Json | Set-Content -Encoding UTF8 "$env:USERPROFILE\.mce\config.json"
-foreach ($k in "whoosh","pop","riser","impact","ding","click","magic","glitch","minecraft") { New-Item -ItemType Directory -Force (Join-Path $Er "SFX\$k") | Out-Null }
+@{ editing_root = $Er; sfx_lib = (Join-Path $Er "SFX"); language = $Language; profile = "general"; minecraft = (-not $NoMinecraft) } | ConvertTo-Json | Set-Content -Encoding UTF8 "$env:USERPROFILE\.mce\config.json"
+$kinds = @("whoosh","pop","riser","impact","ding","click","magic","glitch"); if (-not $NoMinecraft) { $kinds += "minecraft" }
+foreach ($k in $kinds) { New-Item -ItemType Directory -Force (Join-Path $Er "SFX\$k") | Out-Null }
 if (-not (Test-Path style.md)) { if ($Language -eq "en") { Copy-Item style.template.en.md style.md } else { Copy-Item style.template.md style.md } }
 if (-not (Test-Path vocab.txt)) { New-Item vocab.txt | Out-Null }
 
 Step "6/8 Skills"
-uv run python setup\install_skills.py
+if ($NoMinecraft) { uv run python setup\install_skills.py --skip minecraft-edit } else { uv run python setup\install_skills.py }
 npx -y skills add remotion-dev/skills -g -a claude-code -y
 
 Step "7/8 Connect Premiere to Claude"

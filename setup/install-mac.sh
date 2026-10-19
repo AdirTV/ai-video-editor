@@ -1,17 +1,18 @@
 #!/bin/bash
 # AI video editor for Premiere — one-shot installer for macOS.
-# Run from the repo:  bash setup/install-mac.sh [--editing-root PATH] [--language he|en|auto] [--yes]
+# Run from the repo:  bash setup/install-mac.sh [--editing-root PATH] [--language he|en|auto] [--no-minecraft] [--yes]
 #   --yes  never prompt (for an AI assistant running the install); default editing root is
 #          ~/Desktop/editing unless --editing-root is given.
 # Exit code 10 = Homebrew must be installed by the user first (it needs their password).
 set -e
 cd "$(dirname "$0")/.."
-YES=0; ER=""; LANG_OPT="auto"
+YES=0; ER=""; LANG_OPT="auto"; MC=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --yes|-y) YES=1 ;;
     --editing-root) ER="$2"; shift ;;
     --language) LANG_OPT="$2"; shift ;;
+    --no-minecraft) MC=0 ;;
   esac
   shift
 done
@@ -54,16 +55,16 @@ if [ -z "$ER" ] && [ "$YES" = 0 ] && [ -t 0 ]; then
   read -r -p "Where do you keep your editing projects? [~/Desktop/editing]: " ER
 fi
 ER="${ER:-~/Desktop/editing}"
-uv run python - "$ER" "$LANG_OPT" <<'PY'
+uv run python - "$ER" "$LANG_OPT" "$MC" <<'PY'
 import json, sys
 from pathlib import Path
-root, language = sys.argv[1], sys.argv[2]
+root, language, mc = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
 cfg = Path.home() / ".mce" / "config.json"
 cfg.parent.mkdir(exist_ok=True)
 cfg.write_text(json.dumps({"editing_root": root, "sfx_lib": root.rstrip("/") + "/SFX", "language": language,
-                           "profile": "general"}, ensure_ascii=False))
+                           "profile": "general", "minecraft": mc}, ensure_ascii=False))
 lib = Path(root).expanduser() / "SFX"
-for k in ["whoosh", "pop", "riser", "impact", "ding", "click", "magic", "glitch", "minecraft"]:
+for k in ["whoosh", "pop", "riser", "impact", "ding", "click", "magic", "glitch"] + (["minecraft"] if mc else []):
     (lib / k).mkdir(parents=True, exist_ok=True)
 print("settings:", cfg, "| SFX library:", lib)
 PY
@@ -73,7 +74,7 @@ fi
 [ -f vocab.txt ] || : > vocab.txt
 
 step "7/8 Skills"
-uv run python setup/install_skills.py
+if [ "$MC" = 1 ]; then uv run python setup/install_skills.py; else uv run python setup/install_skills.py --skip minecraft-edit; fi
 npx -y skills add remotion-dev/skills -g -a claude-code -y
 
 step "8/8 Connect Premiere to Claude"

@@ -52,7 +52,8 @@ check("panel design", (cep / "index.html").exists() and "cmd-count" in (cep / "i
       "bash panel/install.sh (Mac) or re-run the installer", required=False)
 
 skills = HOME / ".claude" / "skills"
-for s in ("video-edit", "minecraft-edit", "sfx"):
+_cfgd = json.loads(cfg.read_text()) if cfg.exists() else {}
+for s in ("video-edit", "sfx") + (("minecraft-edit",) if _cfgd.get("minecraft", True) else ()):
     check(f"skill: {s}", (skills / s / "SKILL.md").exists(), "uv run python setup/install_skills.py")
 check("Remotion skills", any(skills.glob("remotion-*")),
       "npx -y skills add remotion-dev/skills -g -a claude-code -y", required=False)

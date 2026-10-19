@@ -60,6 +60,10 @@ powershell -ExecutionPolicy Bypass -File $HOME\ai-video-editor\setup\install-win
    - "Add sound effects"
 4. **Notes:** instead of explaining in chat, drop markers with comments on the Premiere timeline and say "read my notes".
 
+## Not making Minecraft videos?
+The editor is general. The Minecraft layer only activates for Minecraft footage, and you can leave it out
+entirely at install: `--no-minecraft` (Mac) or `-NoMinecraft` (Windows). If Claude installs it, it will ask.
+
 ## Language
 Chosen at install: English / Hebrew / auto (`language` in `~/.mce/config.json`). In auto mode the language is
 detected per video: Hebrew is transcribed with ivrit.ai's model, English and other languages with Whisper
