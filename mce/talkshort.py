@@ -6,7 +6,7 @@ You (Claude) choose the takes; this does the editor's handwork:
     deliberate "camera changes" (the podcast/stream-clip style), with a slow push on long pieces
   * audio of neighbouring pieces on alternating tracks with short crossfades (jump cuts aren't heard)
   * word-group captions (Remotion "Captions") timed to the new timeline
-  * layout "full" (face fills 9:16) or "split" (B-roll on the top half, face below, captions on the
+  * layout "full" (face fills 9:16) or "split" (B-roll on the top 40%, face below, captions on the
     seam); split falls back to full wherever no B-roll covers the moment
 
 Config (JSON):
@@ -19,8 +19,12 @@ Config (JSON):
                  # at = shot id from the printed shot list ("06a", "06a+0.9"), timeline seconds, or
                  # "word": "phrase" (first time it's said); fills its shot, slowed (>=0.7x) if too short
   "max_gap": 0.3, "fillers": ["um", "uh"], "punch": [100, 120, 140],   # % on top of the base framing
-  "captions": {"look": "stream", "font": "carlito", "size": 92, "max_words": 3, "fix": {"gta": "GTA"},
-               "hl": {"GTA": "#FFD84D"}, "mov": "graphics/caps v1.mov"},
+  "captions": {"look": "karaoke" | "stream", "font": "carlito", "size": 84, "max_words": 6,
+               "fix": {"gta": "GTA"}, "big": ["pyramids"], "hl": {"GTA": "#FFD84D"}, "mov": "graphics/caps v1.mov"},
+                 # karaoke (clip-channel look): white 2-line phrases, upcoming words dimmed, on the seam
+                 # over split shots and lower-middle over full-frame ones; stream: 1-line light blue groups
+  "split_ratio": 0.4,                        # split layout: top panel = 40% of the height
+  # broll "full": true = full-frame cutaway over the face (hide a flub, mic drop, looking away)
   "music": {"path": "/abs/m.mp3", "in": 4.5, "gain_db": -22},
   "vo_lufs": -11.5, "vo_master": true      # mic stream pre-mastered to <source>_vo<N>.wav (default on)
 }
@@ -36,6 +40,8 @@ from .faces import face_at, track
 from .timeline_xml import _probe
 
 W, H, FPS = 1080, 1920, 60
+DANGLING = {"a", "an", "the", "to", "of", "in", "on", "and", "or", "but", "so", "if", "i", "i'm", "you",
+            "your", "my", "with", "from", "for", "can", "will", "be", "is", "that", "this", "where", "when"}
 FILLERS = {"um", "uh", "umm", "uhh", "erm", "hmm", "mm", "ah"}
 
 
@@ -179,6 +185,51 @@ def captions(cuts: list[dict], cfg: dict) -> list[dict]:
     return caps
 
 
+def phrases(cuts: list[dict], cfg: dict, breaks: list[float] = ()) -> list[dict]:
+    """Karaoke captions: a phrase (up to ~2 lines) is shown whole, each word lights up as it is said.
+    Each cap: text, start/end, words [{"t": seconds from cap start}], big = words drawn larger.
+    breaks: timeline seconds where the layout changes (seam <-> lower middle) — a phrase never spans one."""
+    fix = {k.lower(): v for k, v in cfg.get("fix", {}).items()}
+    big = {_norm(w) for w in cfg.get("big", [])}
+    mw, maxc = cfg.get("max_words", 6), cfg.get("max_chars", 26)
+    caps, group = [], []
+
+    def flush():
+        if group:
+            t0 = group[0][1]
+            caps.append({"start": round(t0, 2), "end": round(group[-1][2] + 0.25, 2),
+                         "text": " ".join(g[0] for g in group),
+                         "words": [round(g[1] - t0, 2) for g in group]})
+            bw = [g[0] for g in group if _norm(g[0]) in big]
+            if bw:
+                caps[-1]["big"] = bw
+            group.clear()
+    for c in cuts:
+        for w in c["words"]:
+            raw = w["word"]
+            txt = fix.get(_norm(raw), raw).rstrip(".,")  # the style drops end punctuation
+            ts = w["start"] - c["in"] + c["start"]
+            te = min(w["end"], c["out"]) - c["in"] + c["start"]
+            if group and any(group[0][1] < b <= ts + 0.01 for b in breaks):
+                flush()
+            if group and (len(group) >= mw or len(" ".join(g[0] for g in group) + txt) > maxc
+                          or ts - group[-1][2] > 0.3):
+                carry = []
+                while len(group) > 2 and _norm(group[-1][0]) in DANGLING:  # never end a phrase on "a"/"the"…
+                    carry.insert(0, group.pop())
+                flush()
+                group.extend(carry)
+            group.append((txt, ts, te))
+            if raw[-1:] in ".!?," and (len(group) >= 2 or len(txt) >= 4):
+                flush()
+        flush()
+    for a, b in zip(caps, caps[1:]):
+        if b["start"] - a["end"] < 0.4:
+            a["end"] = b["start"]
+        a["end"] = min(a["end"], b["start"])
+    return caps
+
+
 def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     rel = lambda p: str(p if Path(p).is_absolute() else base / p)
     src = cfg["source"]
@@ -186,6 +237,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     faces = track(src, out=Path(rel(cfg.get("faces", Path(src).stem + "_faces.json"))))
     fillers = set(cfg.get("fillers", FILLERS))
     split = cfg.get("layout", "full") == "split"
+    seam = round(H * cfg.get("split_ratio", 0.4))  # split: picture above the seam, face below (40/60)
     punch = cfg.get("punch", [100, 120, 140])
 
     # 1. cut list
@@ -252,6 +304,8 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         """b-roll (one clip or several back to back) covers the whole range"""
         t = t0
         for bb in brolls:
+            if bb.get("full"):
+                continue
             if bb["at"] <= t + 0.05 and bb["at"] + bb["dur"] > t:
                 t = bb["at"] + bb["dur"]
         return t >= t1 - 0.05
@@ -267,7 +321,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     v_face, v_broll, a_tracks = [], [], [[], []]
     # full: face high enough that captions on the seam (y≈900) sit under the chin on punch-ins
     full_box, full_target = (0, 0, W, H), (540, 620)
-    low_box, low_target = (0, 960, W, H), (540, 1400)
+    low_box, low_target = (0, seam, W, H), (540, round(seam + (H - seam) * 0.42))
     full_base, low_base = H / 1080 * 100, cfg.get("low_base", 140.0)  # bottom panel: face fills it
     prev = -1
     xf = cfg.get("xfade", 0.04)
@@ -286,7 +340,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         clip = {"file": "src", "start": sh["start"], "in": sh["in"], "out": sh["out"], **pos,
                 "name": f"{sh['id']} {sh['label']}"}
         if low:  # bottom panel: static, cropped at the seam so it never spills into the top panel
-            over = 960 - (pos["y"] - 540 * pos["scale"] / 100)
+            over = seam - (pos["y"] - 540 * pos["scale"] / 100)
             if over > 0:
                 clip["crop"] = [0, 0, round(over / (pos["scale"] / 100) / 1080 * 100, 2), 0]
         elif d > 1.2:  # gentle push so no shot sits dead still
@@ -303,15 +357,16 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         fid = paths.setdefault(b["path"], f"b{len(paths)}")
         files[fid] = {"path": b["path"]}
         pr = _probe(b["path"])
-        ph = 960 if split else H                       # panel height
+        top = split and not b.get("full")              # "full": full-frame cutaway (hides the face, e.g. a flub)
+        ph = seam if top else H                        # panel height
         k = max(W / pr["width"], ph / pr["height"]) * 100 * b.get("zoom", 1)  # zoom >1 hides letterboxing
         x = 540 + (0.5 - b.get("fx", 0.5)) * (pr["width"] * k / 100 - W)    # fx: horizontal focus 0..1
         y = ph / 2
         src_len = b["dur"] * b["speed"]
         clip = {"file": fid, "start": b["at"], "in": b["in"], "out": round(b["in"] + src_len, 3),
                 "scale": round(k, 2), "x": round(x), "y": y, "name": b.get("name", Path(b["path"]).stem)}
-        if split:  # top panel: static, cropped at the seam (letterbox bars would cover the face panel)
-            over = y + pr["height"] / 2 * k / 100 - 960
+        if top:  # top panel: static, cropped at the seam (letterbox bars would cover the face panel)
+            over = y + pr["height"] / 2 * k / 100 - seam
             if over > 0:
                 clip["crop"] = [0, 0, 0, round(over / (k / 100) / pr["height"] * 100, 2)]
         else:
@@ -326,11 +381,26 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
 
     # 5. captions
     cc = cfg.get("captions", {})
-    caps = captions(cuts, cc)
-    size = cc.get("size", 92 if split else 104)
-    props = {"caps": caps, "top": cc.get("top", round(960 - size * 0.62) if split else 1180),
-             "size": size, "seconds": round(end, 2), "font": cc.get("font", "carlito"),
-             "look": cc.get("look", "stream")}
+    look = cc.get("look", "stream")
+    if look == "karaoke":
+        size = cc.get("size", 84)
+        full_y = cc.get("full_y", 1300)
+        cut_full = [(b["at"], b["at"] + b["dur"]) for b in brolls if b.get("full")]
+
+        def on_split(t):
+            return split and covered(t, t + 0.1) and not any(a <= t < z for a, z in cut_full)
+        marks = sorted({sh["start"] for sh in shots} | {x for ab in cut_full for x in ab})
+        breaks = [m for m in marks if m > 0 and on_split(m + 0.02) != on_split(m - 0.15)]
+        caps = phrases(cuts, cc, breaks)
+        for cp in caps:  # on the seam over split shots, lower-middle over full-frame ones
+            cp["y"] = seam if on_split(cp["start"] + 0.06) else full_y
+        props = {"caps": caps, "size": size, "seconds": round(end, 2), "font": cc.get("font", "carlito"),
+                 "look": look}
+    else:
+        caps = captions(cuts, cc)
+        size = cc.get("size", 92 if split else 104)
+        props = {"caps": caps, "top": cc.get("top", round(960 - size * 0.62) if split else 1180),
+                 "size": size, "seconds": round(end, 2), "font": cc.get("font", "carlito"), "look": look}
     video = [v_face, v_broll]
     mov = cc.get("mov")
     if mov and Path(rel(mov)).exists():
