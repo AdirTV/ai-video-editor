@@ -77,9 +77,10 @@ continuous), crossfades audio on alternating tracks, and writes `caps_props.json
   (find bars with `cropdetect`), panels are cropped at the seam.
 - Pick B-roll by what is said (money → cash shots, "robbing a store" → robbery…). Find shot boundaries with
   `select='gt(scene,0.3)'` so in/out never crosses a cut. Official trailers via `yt-dlp` (H.264) → CFR 60.
-- Clip-channel look (default for talking-head shorts, see style.md): split 40/60 (`split_ratio`), top = a *literal*
-  picture of what is said; captions `look: "karaoke"` (white 2-line phrases, unsaid words dim, `big` punch words,
-  seam over split shots / lower-middle over full ones, never across a layout change).
+- Talking-head shorts (see style.md): split 40/60 (`split_ratio`), top = a *literal* picture of what is said;
+  captions **one line, same size, one fixed position** (`look: "stream"`, top on the seam) — the user rejected the
+  2-line karaoke look and moving captions. Frame full-frame shots low (`full_target_y`, `full_base`) so the fixed
+  caption never covers the mouth. Add music (≈16 dB under the voice).
 - Hide anything unwanted in the picture (mic lowered, looking away, a flub) with a B-roll `"full": true` cutaway —
   audio keeps running. End on the last content line, not a filler question.
 - Order: config → talkshort → render captions (new filename each time) → talkshort again (picks up the .mov) → push.

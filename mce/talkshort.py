@@ -115,12 +115,30 @@ def split_on_silence(ps: list[dict], sil: list[tuple[float, float]], pad: float 
     return out
 
 
-def master_voice(src: str, stream: int = 0) -> str:
-    out = Path(src).with_name(Path(src).stem + f"_vo{stream}.wav")
-    if not out.exists():
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-map", f"0:a:{stream}", "-af",
-                        "acompressor=threshold=-20dB:ratio=3:attack=5:release=120,loudnorm=I=-14:TP=-2:LRA=9,"
-                        "aresample=48000,alimiter=limit=0.79", "-ar", "48000", "-ac", "2", str(out)], check=True)
+VOICE_CHAIN = (  # clean-up + presence for a talking-head mic, before loudness
+    "highpass=f=80,afftdn=nr=10:nf=-62:tn=1,"
+    "equalizer=f=300:t=q:w=1:g=-3,equalizer=f=3500:t=q:w=1.2:g=3.5,highshelf=f=9000:g=2,"
+    "deesser=i=0.4,acompressor=threshold=-22dB:ratio=2.5:attack=8:release=150:makeup=2")
+
+
+def master_voice(src: str, stream: int = 0, chain: str = VOICE_CHAIN) -> str:
+    """Voice WAV: clean-up chain, then two-pass *linear* loudnorm (-14 LUFS, -2 dBTP) and a true limiter.
+    (Single-pass loudnorm pumps the room noise up in pauses; alimiter's default auto-level pushes every
+    peak to 0 dBFS — both made the first version sound squashed.)"""
+    import hashlib
+    tag = hashlib.md5(chain.encode()).hexdigest()[:6]
+    out = Path(src).with_name(Path(src).stem + f"_vo{stream}_{tag}.wav")
+    if out.exists():
+        return str(out)
+    base = ["ffmpeg", "-hide_banner", "-y", "-i", src, "-map", f"0:a:{stream}"]
+    log = subprocess.run(base + ["-af", chain + ",loudnorm=I=-14:TP=-2:LRA=7:print_format=json", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    m = json.loads(log[log.rindex("{"):log.rindex("}") + 1])
+    ln = (f"loudnorm=I=-14:TP=-2:LRA=7:linear=true:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
+          f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}")
+    subprocess.run(base + ["-v", "error", "-af", f"{chain},{ln},aresample=48000,"
+                           "alimiter=limit=0.79:level=disabled:attack=5:release=50",
+                           "-ar", "48000", "-ac", "2", str(out)], check=True)
     return str(out)
 
 
@@ -316,13 +334,14 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     if cfg.get("vo_master", True):
         # voice pre-mastered once (compressor + loudnorm -14 + limiter -2 dBTP) -> no clipping when gained,
         # and no multi-stream recordings for Premiere to mis-map
-        files["vo"] = {"path": master_voice(src, astream - 1)}
+        files["vo"] = {"path": master_voice(src, astream - 1, cfg.get("voice_chain", VOICE_CHAIN))}
         afile, astream = "vo", 1
     v_face, v_broll, a_tracks = [], [], [[], []]
     # full: face high enough that captions on the seam (y≈900) sit under the chin on punch-ins
-    full_box, full_target = (0, 0, W, H), (540, 620)
+    full_box, full_target = (0, 0, W, H), (540, cfg.get("full_target_y", 620))
     low_box, low_target = (0, seam, W, H), (540, round(seam + (H - seam) * 0.42))
-    full_base, low_base = H / 1080 * 100, cfg.get("low_base", 140.0)  # bottom panel: face fills it
+    # full_base > 177.8 (fill) leaves room to lift the face above captions that sit on the seam
+    full_base, low_base = cfg.get("full_base", H / 1080 * 100), cfg.get("low_base", 140.0)  # bottom panel: face fills it
     prev = -1
     xf = cfg.get("xfade", 0.04)
     for n, sh in enumerate(shots):
@@ -399,7 +418,8 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     else:
         caps = captions(cuts, cc)
         size = cc.get("size", 92 if split else 104)
-        props = {"caps": caps, "top": cc.get("top", round(960 - size * 0.62) if split else 1180),
+        # one fixed position for the whole short (moving captions read as a glitch): on the seam
+        props = {"caps": caps, "top": cc.get("top", round(seam - size * 0.3) if split else 1180),
                  "size": size, "seconds": round(end, 2), "font": cc.get("font", "carlito"), "look": look}
     video = [v_face, v_broll]
     mov = cc.get("mov")
