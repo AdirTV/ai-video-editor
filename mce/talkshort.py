@@ -83,8 +83,27 @@ def pieces(take: tuple[float, float], words: list[dict], max_gap: float, fillers
         a = max(g[0]["start"] - lead, (prev_end + g[0]["start"]) / 2, t0 - 0.3)
         b = min(g[-1]["end"] + tail, (g[-1]["end"] + next_start) / 2)
         b = min(b, t1 + tail)
-        out.append({"in": round(a, 3), "out": round(b, 3), "words": g})
+        piece = {"in": round(a, 3), "out": round(b, 3), "words": g}
+        if i0 and _norm(allw[i0 - 1]["word"]) in fillers and g[0]["start"] - allw[i0 - 1]["end"] < 0.12:
+            # a filler runs straight into this word ("so|this"): cut at the quietest point of the joint
+            # and start the audio hard (no crossfade pre-roll that would bring the "-o" back)
+            piece["hard_in"] = (allw[i0 - 1]["end"] - 0.03, g[0]["start"] + 0.04)
+        out.append(piece)
     return out
+
+
+def quietest(src: str, stream: int, t0: float, t1: float, win: float = 0.01) -> float:
+    """Time of the lowest-energy 10 ms window in [t0, t1] of the voice track."""
+    import numpy as np
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t0:.3f}", "-t", f"{t1 - t0:.3f}", "-i", src,
+                          "-map", f"0:a:{stream}", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"],
+                         capture_output=True).stdout
+    x = np.frombuffer(raw, np.int16).astype(float)
+    n = int(8000 * win)
+    if len(x) < n:
+        return t1
+    rms = [np.sqrt((x[i:i + n] ** 2).mean()) for i in range(0, len(x) - n + 1, n // 2)]
+    return round(t0 + int(np.argmin(rms)) * (n // 2) / 8000, 3)
 
 
 def silences(src: str, stream: int = 0, db: float = -38, min_len: float = 0.3) -> list[tuple[float, float]]:
@@ -136,10 +155,33 @@ def master_voice(src: str, stream: int = 0, chain: str = VOICE_CHAIN) -> str:
     m = json.loads(log[log.rindex("{"):log.rindex("}") + 1])
     ln = (f"loudnorm=I=-14:TP=-2:LRA=7:linear=true:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
           f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}")
+    tmp = out.with_suffix(".tmp.wav")
     subprocess.run(base + ["-v", "error", "-af", f"{chain},{ln},aresample=48000,"
                            "alimiter=limit=0.79:level=disabled:attack=5:release=50",
-                           "-ar", "48000", "-ac", "2", str(out)], check=True)
+                           "-ar", "48000", "-ac", "2", str(tmp)], check=True)
+    # filters (denoise, limiter look-ahead) delay the signal: measure it against the source and trim it,
+    # or the voice drifts out of lip-sync (30 ms with this chain) and cut points land late
+    lag = _lag(src, stream, str(tmp))
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(tmp), "-af",
+                    f"atrim=start={max(0.0, lag):.4f},asetpts=PTS-STARTPTS", str(out)], check=True)
+    tmp.unlink()
+    print(f"voice master: delay {lag * 1000:.1f} ms trimmed")
     return str(out)
+
+
+def _lag(src: str, stream: int, processed: str, t: float = 60, d: float = 30) -> float:
+    """Seconds by which `processed` lags the source voice (envelope cross-correlation)."""
+    import numpy as np
+
+    def env(f: str, st: int) -> np.ndarray:
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(t), "-t", str(d), "-i", f, "-map", f"0:a:{st}",
+                              "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], capture_output=True).stdout
+        x = np.abs(np.frombuffer(raw, np.int16).astype(float))
+        return np.convolve(x / (x.max() + 1), np.ones(40) / 40, "same")
+    a, b = env(src, stream), env(processed, 0)
+    n, m = min(len(a), len(b)), 800  # search +-100 ms
+    c = [np.dot(a[m:n - m], b[m + k:n - m + k]) for k in range(-m, m + 1)]
+    return (int(np.argmax(c)) - m) / 8000
 
 
 def _cover(k: float, x: float, y: float, box: tuple[float, float, float, float]) -> tuple[float, float]:
@@ -172,16 +214,20 @@ def captions(cuts: list[dict], cfg: dict, breaks: list[float] = ()) -> list[dict
                          "text": " ".join(g[0] for g in group)})
             group.clear()
     for c in cuts:
-        for w in c["words"]:
+        for wi, w in enumerate(c["words"]):
             raw = w["word"]
             txt = fix.get(_norm(raw), raw)
+            if wi == 0:  # a piece starts a sentence (also after a cut-out "so")
+                txt = txt[:1].upper() + txt[1:]
             ts = w["start"] - c["in"] + c["start"]
             te = min(w["end"], c["out"]) - c["in"] + c["start"]
             at_break = any(group[0][1] < b <= ts + 0.01 for b in breaks) if group else False
             if group and (len(group) >= mw or len(" ".join(g[0] for g in group) + txt) > maxc
                           or ts - group[-1][2] > 0.25 or at_break):
                 carry = []
-                while not at_break and len(group) > 2 and _norm(group[-1][0]) in ("the", "a", "an"):
+                while not at_break and len(group) > 1 and (
+                        (len(group) > 2 and _norm(group[-1][0]) in ("the", "a", "an"))
+                        or _norm(group[-1][0]) in {_norm(g) for g in cfg.get("glue", [])}):
                     carry.insert(0, group.pop())  # "cash and escape | the cops" -> "the" moves on
                 flush()
                 group.extend(carry)
@@ -270,6 +316,9 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     sil = silences(src, cfg.get("stream", 1) - 1, cfg.get("silence_db", -38), gap)
     for take in cfg["takes"]:
         for p in split_on_silence(pieces((take[0], take[1]), words, gap, fillers), sil):
+            if p.get("hard_in"):
+                p["in"] = quietest(src, cfg.get("stream", 1) - 1, *p.pop("hard_in"))
+                p["hard_in"] = True
             p["start"] = round(t, 3)
             p["label"] = take[2] if len(take) > 2 else ""
             t += p["out"] - p["in"]
@@ -373,9 +422,10 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
             clip["keys"] = [{"t": 0, **pos}, {"t": round(d, 3), **z}]
         v_face.append(clip)
     for i, c in enumerate(cuts):
-        a = {"file": afile, "start": max(0, c["start"] - xf), "in": max(0, c["in"] - xf), "out": c["out"] + xf,
+        pre = 0 if c.get("hard_in") else xf
+        a = {"file": afile, "start": max(0, c["start"] - pre), "in": max(0, c["in"] - pre), "out": c["out"] + xf,
              "stream": astream, "name": f"{i + 1:02d} {c['label']}"}
-        a["fade_in"] = a["fade_out"] = xf * 2
+        a["fade_in"], a["fade_out"] = (0.015 if c.get("hard_in") else xf * 2), xf * 2
         if i == len(cuts) - 1:  # the last tail must not outlast the picture (renders black frames)
             a["out"] = c["out"]
         a_tracks[i % 2].append(a)
@@ -407,7 +457,12 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
                               "gain_db": b["audio_db"], "name": clip["name"]}])
 
     # sfx: whoosh where the picture changes layout into b-roll (face -> split, or into a full cutaway)
-    sfx = list(cfg.get("sfx", []))
+    sfx = []
+    for x in cfg.get("sfx", []):  # "at": shot id ("07a", "07a+1.38") like b-roll, or "t": seconds
+        if isinstance(x.get("at"), str):
+            sid, _, off = x["at"].partition("+")
+            x = {**{k: v for k, v in x.items() if k != "at"}, "t": round(by_id[sid]["start"] + float(off or 0), 3)}
+        sfx.append(x)
     if cfg.get("auto_whoosh", True) and brolls:
         last = -9.0
         for b in brolls:
@@ -441,11 +496,27 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         top = cc.get("top", 1460)                      # full-frame shots: lower third
         seam_top = cc.get("seam_top", round(seam - size * 0.55))  # split shots: centred on the seam
         caps = captions(cuts, cc, breaks if cc.get("follow_layout", True) else [])
-        for i in range(len(caps) - 2, -1, -1):  # a caption shorter than 0.3 s is a flash: join the next one
-            if caps[i]["end"] - caps[i]["start"] < 0.3 and caps[i + 1]["start"] - caps[i]["end"] < 0.1:
-                nx = caps.pop(i + 1)
-                caps[i] = {**nx, "start": caps[i]["start"], "text": caps[i]["text"] + " " + nx["text"],
-                           "hl": {**caps[i].get("hl", {}), **nx.get("hl", {})}, "_tl": nx["start"]}
+        # a caption shorter than 0.3 s is a flash: join the previous one when nothing (cut, layout change)
+        # separates them, else the next one
+        same = lambda a, b: not any(a["start"] < x <= b["start"] + 0.01 for x in breaks)
+        i = 0
+        while i < len(caps):
+            c0 = caps[i]
+            if c0["end"] - c0["start"] < 0.3 and len(caps) > 1:
+                hl = lambda o: {**o.get("hl", {}), **c0.get("hl", {})}
+                if i and same(caps[i - 1], c0) and c0["start"] - caps[i - 1]["end"] < 0.1:
+                    p = caps[i - 1]
+                    caps[i - 1] = {**p, "end": c0["end"], "text": p["text"] + " " + c0["text"], "hl": hl(p)}
+                    caps.pop(i)
+                    continue
+                if i + 1 < len(caps) and caps[i + 1]["start"] - c0["end"] < 0.1:
+                    nx = caps.pop(i + 1)
+                    caps[i] = {**nx, "start": c0["start"], "text": c0["text"] + " " + nx["text"], "hl": hl(nx),
+                               "_tl": nx["start"]}
+            i += 1
+        for c_ in caps:
+            if not c_.get("hl"):
+                c_.pop("hl", None)
         if cc.get("follow_layout", True) and split:
             for cp in caps:
                 cp["top"] = seam_top if on_split(cp.pop("_tl", cp["start"]) + 0.02) else top
