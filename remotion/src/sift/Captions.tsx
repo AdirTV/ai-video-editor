@@ -20,13 +20,13 @@ export type Cap = {
   y?: number;        // karaoke: vertical centre of this caption (px)
 };
 
-// "bold": white, thick black stroke + drop (default). "stream": light-blue, thin navy outline, soft pop
+// "bold": white, thick black stroke + drop (default). "stream": white (Adir's default; was light blue), thin navy outline, soft pop
 // (the clip-channel look: game on top, face below, captions on the seam).
 type Look = "bold" | "stream" | "karaoke";
 const LOOKS = {
   bold: { color: "white", stroke: "#111", strokeK: 0.15, shadow: (s: number) => "0 10px 0 #111", weight: 900, pop: 1 },
   karaoke: { color: "white", stroke: "#000", strokeK: 0.11, shadow: (s: number) => `0 ${Math.round(s * 0.05)}px ${Math.round(s * 0.1)}px rgba(0,0,0,.75)`, weight: 700, pop: 0.15 },
-  stream: { color: "#A9D8FF", stroke: "#0B1B2E", strokeK: 0.09, shadow: (s: number) => `0 ${Math.round(s * 0.04)}px ${Math.round(s * 0.08)}px rgba(0,0,0,.6)`, weight: 700, pop: 0.35 },
+  stream: { color: "white", stroke: "#0B1B2E", strokeK: 0.09, shadow: (s: number) => `0 ${Math.round(s * 0.04)}px ${Math.round(s * 0.08)}px rgba(0,0,0,.6)`, weight: 700, pop: 0.35 },
 };
 
 const Word: React.FC<{ cap: Cap; frames: number; size: number; font: Font; look: Look; color?: string }> = ({

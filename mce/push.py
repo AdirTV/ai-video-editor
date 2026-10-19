@@ -6,6 +6,7 @@ Extra spec fields (see timeline_xml for the rest):
   clip  "pop": "start" | "end" | "both"            -> Film Impact "Pop Motion"
   top   "transitions": [{"name": "Glitch", "track": 0, "t": 2.417, "dur": 0.25}]
   top   "replaces": "<sequence name to delete after import>"
+  top   "project": "/abs/x.prproj" -> make sure that project is the active one before importing
   top   "auto_sfx": true   -> place sound effects from the SFX library (see mce/sfx.py)
   top   "music_playlist": {"songs": [{"file": "m1", "until": 30}, {"file": "m2"}], "xfade": null}
         -> songs back to back, crossfaded on alternating tracks (A fades out over B's entrance)
@@ -62,6 +63,16 @@ def push(spec_path: str, export: str | None = None) -> None:
             print(("✓ " if _ok(res) else "✗ ") + label + ("" if _ok(res) else f"  → {res[:200]}"))
             return res
 
+        if spec.get("project"):
+            # several projects can be open (other sessions); never import into whichever happens to be active
+            info = json.loads(c.call("get_project_info", {}))
+            info = info.get("data", info)
+            if Path(info.get("path", "")).resolve() != Path(spec["project"]).resolve():
+                call("open_project", {"path": spec["project"]}, f"open {Path(spec['project']).name}")
+                info = json.loads(c.call("get_project_info", {}))
+                info = info.get("data", info)
+                if Path(info.get("path", "")).resolve() != Path(spec["project"]).resolve():
+                    raise SystemExit(f"active project is {info.get('path')}, not {spec['project']} — stopping")
         call("import_fcp_xml", {"path": str(xml), "mode": "into_open_project"}, "import")
         call("set_active_sequence", {"sequence_id": spec["name"]}, f"activate {spec['name']}")
         seq = json.loads(c.call("get_active_sequence", {"track_type": "video", "clip_limit": 200}))

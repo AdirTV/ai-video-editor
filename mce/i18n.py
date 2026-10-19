@@ -13,6 +13,8 @@ _lang = LANGUAGE if LANGUAGE in ("he", "en") else "en"
 MSG = {
     # qa
     "black": ("🔴 מסך שחור {s:.2f}–{e:.2f}s", "🔴 Black frames {s:.2f}–{e:.2f}s"),
+    "black_tail": ("🔴 פריימים שחורים בסוף ({d:.2f}s) — קליפ אודיו ארוך מהתמונה?",
+                   "🔴 Black frames at the end ({d:.2f}s) — an audio clip longer than the picture?"),
     "freeze": ("🟡 תמונה קפואה {s:.2f}–{e:.2f}s (בסדר אם זה מכוון)", "🟡 Frozen picture {s:.2f}–{e:.2f}s (fine if intended)"),
     "lufs": ("{mark} עוצמה כוללת {i:.1f} LUFS (יעד יוטיוב {target:.0f})", "{mark} Integrated loudness {i:.1f} LUFS (YouTube target {target:.0f})"),
     "peak": ("{mark} שיא {p:.1f} dBTP (מקסימום {max:.0f})", "{mark} True peak {p:.1f} dBTP (max {max:.0f})"),

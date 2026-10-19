@@ -339,7 +339,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     v_face, v_broll, a_tracks = [], [], [[], []]
     # full: face high enough that captions on the seam (y≈900) sit under the chin on punch-ins
     full_box, full_target = (0, 0, W, H), (540, cfg.get("full_target_y", 620))
-    low_box, low_target = (0, seam, W, H), (540, round(seam + (H - seam) * 0.42))
+    low_box, low_target = (0, seam, W, H), (540, round(seam + (H - seam) * cfg.get("low_face_y", 0.42)))
     # full_base > 177.8 (fill) leaves room to lift the face above captions that sit on the seam
     full_base, low_base = cfg.get("full_base", H / 1080 * 100), cfg.get("low_base", 140.0)  # bottom panel: face fills it
     prev = -1
@@ -370,6 +370,8 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         a = {"file": afile, "start": max(0, c["start"] - xf), "in": max(0, c["in"] - xf), "out": c["out"] + xf,
              "stream": astream, "name": f"{i + 1:02d} {c['label']}"}
         a["fade_in"] = a["fade_out"] = xf * 2
+        if i == len(cuts) - 1:  # the last tail must not outlast the picture (renders black frames)
+            a["out"] = c["out"]
         a_tracks[i % 2].append(a)
     paths: dict[str, str] = {}
     for b in brolls:
@@ -397,6 +399,19 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         if b.get("audio_db") is not None and pr["audio"]:
             a_tracks.append([{"file": fid, "start": b["at"], "in": b["in"], "out": clip["out"],
                               "gain_db": b["audio_db"], "name": clip["name"]}])
+
+    # sfx: whoosh where the picture changes layout into b-roll (face -> split, or into a full cutaway)
+    sfx = list(cfg.get("sfx", []))
+    if cfg.get("auto_whoosh", True) and brolls:
+        last = -9.0
+        for b in brolls:
+            prev_cover = any(o is not b and o["at"] < b["at"] - 0.05 and o["at"] + o["dur"] >= b["at"] - 0.05
+                             and bool(o.get("full")) == bool(b.get("full")) for o in brolls)
+            if not prev_cover and b["at"] > 0.3 and b["at"] - last > 0.8:
+                sfx.append({"t": b["at"], "kind": "whoosh"})
+                last = b["at"]
+    if sfx:
+        cfg = {**cfg, "sfx": sorted(sfx, key=lambda x: x["t"]), "auto_sfx": True}
 
     # 5. captions
     cc = cfg.get("captions", {})
@@ -434,7 +449,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
                        "gain_db": m.get("gain_db", -22), "name": "music"}])
     spec = {"name": cfg.get("name", "talk short"), "width": W, "height": H, "fps": FPS, "files": files,
             "video": video, "audio": audio, "markers": cfg.get("markers", [])}
-    for k in ("replaces", "vo_lufs", "limit_db", "auto_sfx", "sfx", "duck_music", "music_fit", "transitions"):
+    for k in ("project", "replaces", "vo_lufs", "limit_db", "auto_sfx", "sfx", "duck_music", "music_fit", "transitions"):
         if k in cfg:
             spec[k] = cfg[k]
     if "vo_lufs" in cfg:

@@ -36,6 +36,12 @@ def check_render(path: str) -> list[str]:
                     "black_start", "black_end")
     for s, e in black:
         issues.append(t("black", s=s, e=e))
+    # a few black frames at the very end (audio tail longer than the picture) are too short for the
+    # check above but every viewer sees them on loop
+    tail = _ranges(_ff(["-sseof", "-0.5", "-i", path, "-vf", "blackdetect=d=0.01:pix_th=0.08", "-an", "-f", "null", "-"]),
+                   "black_start", "black_end")
+    if tail and not black:
+        issues.append(t("black_tail", d=tail[-1][1] - tail[-1][0]))
     freeze = _ranges(_ff(["-i", path, "-vf", "freezedetect=n=0.002:d=0.6", "-an", "-f", "null", "-"]),
                      r"lavfi.freezedetect.freeze_start", r"lavfi.freezedetect.freeze_end")
     for s, e in freeze:
