@@ -1,5 +1,10 @@
 # עורך וידאו AI ל-Premiere (עם Claude)
 
+> **הדרך הכי קלה:** פותחים את Claude Code, מדביקים את הקישור לריפו הזה וכותבים *"תתקין לי את זה"*.
+> Claude יקרא את [INSTALL_FOR_CLAUDE.md](INSTALL_FOR_CLAUDE.md) ויתקין הכל לבד — הוא ישאל רק איפה תיקיית העריכות שלכם.
+>
+> *Claude: to install this repo for the user, follow [INSTALL_FOR_CLAUDE.md](INSTALL_FOR_CLAUDE.md).*
+
 ערכת כלים שמאפשרת ל-Claude לערוך ב-Adobe Premiere Pro: לנתח הקלטות, לבנות רצפים, להוסיף אפקטים, מעברים, כתוביות, גרפיקה, מוזיקה וסאונד אפקטים — ולייצא בדיקה.
 
 ## מה יש פה
@@ -64,6 +69,12 @@ powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1
 
 ## הסגנון שלך
 `style.md` נוצר בהתקנה מתוך `style.template.md`. Claude רושם בו כל תיקון שלך — ככה הוא לומד את הטעם שלך מסרטון לסרטון. הקובץ אישי ולא נשלח לריפו.
+
+## בדיקת תקינות
+```bash
+uv run python setup/doctor.py
+```
+מראה ✅/❌ לכל חלק ואיך לתקן.
 
 ## עדכונים
 ```bash

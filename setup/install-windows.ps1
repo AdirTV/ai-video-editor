@@ -1,5 +1,7 @@
 # AI video editor for Premiere — one-shot installer for Windows (PowerShell).
-# Run from the repo:  powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1
+# Run from the repo:  powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1 [-EditingRoot PATH] [-Yes]
+#   -Yes  never prompt (for an AI assistant running the install).
+param([string]$EditingRoot = "", [switch]$Yes)
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 $Repo = (Get-Location).Path
@@ -29,7 +31,8 @@ uv sync
 Push-Location remotion; npm install; Pop-Location
 
 Step "5/8 Settings"
-$Er = Read-Host "Where do you keep your editing projects? [$env:USERPROFILE\Desktop\editing]"
+$Er = $EditingRoot
+if (-not $Er -and -not $Yes) { $Er = Read-Host "Where do you keep your editing projects? [$env:USERPROFILE\Desktop\editing]" }
 if (-not $Er) { $Er = "$env:USERPROFILE\Desktop\editing" }
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.mce" | Out-Null
 @{ editing_root = $Er; sfx_lib = (Join-Path $Er "SFX") } | ConvertTo-Json | Set-Content -Encoding UTF8 "$env:USERPROFILE\.mce\config.json"
@@ -45,6 +48,7 @@ Step "7/8 Connect Premiere to Claude"
 & $Claude mcp remove premiere -s user 2>$null
 & $Claude mcp add premiere -s user -e PREMIERE_MCP_TOOL_PACKS=essential,inspection,captions -- premiere-pro-mcp
 
+uv run python setup\doctor.py
 Step "8/8 Done"
 Write-Host "Next: restart Premiere -> Window > Extensions > MCP for Adobe Premiere Pro -> Start." -ForegroundColor Green
 Write-Host "Then open a terminal in your project folder and run: claude"

@@ -1,0 +1,55 @@
+# Installing this repo — instructions for Claude
+
+You are Claude Code, and a user gave you this repo's link and asked you to install it. Follow these steps
+in order. Talk to the user in their language (usually Hebrew). Explain briefly what each step does; don't
+dump command output on them.
+
+## 0. Before you start
+- This needs **Claude Code with shell access** (the desktop app's Code tab or the `claude` CLI). If you are
+  a chat-only Claude without a terminal, tell the user to open Claude Code and paste the link there.
+- Ask the user one question: **where do they keep their editing projects?** (default: `~/Desktop/editing`
+  on Mac, `%USERPROFILE%\Desktop\editing` on Windows). Everything else has defaults.
+- Detect the OS (`uname` / `$env:OS`).
+
+## 1. Get the code
+Clone to a permanent place (not Downloads):
+- Mac: `git clone https://github.com/AdirTV/ai-video-editor.git ~/ai-video-editor`
+- Windows: `git clone https://github.com/AdirTV/ai-video-editor.git "$HOME\ai-video-editor"`
+  (if `git` is missing: `winget install --id Git.Git -e`, then open a new shell)
+
+If cloning fails with an authentication error, the repo is private: the user must accept the GitHub
+invitation from Adir (check their email / github.com/notifications) and sign in once with
+`gh auth login` (install `gh` with `brew install gh` / `winget install GitHub.cli`), or download the ZIP
+from the repo page and extract it to the same place.
+
+## 2. Run the installer (non-interactive)
+- **Mac**: `bash ~/ai-video-editor/setup/install-mac.sh --yes --editing-root "<folder>"`
+  - **Exit code 10** = Homebrew is missing. Its installer needs the user's password, which you must not
+    handle. Ask the user to paste this into their own Terminal app, wait for it to finish, then re-run step 2:
+    `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
+- **Windows**: `powershell -ExecutionPolicy Bypass -File "$HOME\ai-video-editor\setup\install-windows.ps1" -Yes -EditingRoot "<folder>"`
+  - winget may show permission (UAC) pop-ups — tell the user to click **Yes** on them.
+
+The installer is long (several minutes, downloads ~2 GB of Python/Node packages). Run it in the
+background or with a long timeout and report progress per step (it prints `== n/8 ...`).
+It installs: ffmpeg, Node, uv, yt-dlp, the Premiere bridge (premiere-pro-mcp) and its panel, the Python
+and Remotion dependencies, the skills (`minecraft-edit`, `sfx`, Remotion's), and registers the
+`premiere` MCP server with Claude Code.
+
+## 3. Verify
+`cd <repo> && uv run python setup/doctor.py` — every required line must be ✅. For each ❌ it prints the
+fix; apply it and run doctor again. The "Premiere is open" line is expected to be ⚠️ until step 4.
+
+## 4. Hand-off to the user (they must do these themselves)
+1. **Restart Claude Code** (new skills and the new MCP server load only in a new session).
+2. **Restart Premiere Pro**, then **Window → Extensions → MCP for Adobe Premiere Pro** → make sure it
+   says the connector is running (press Start if needed).
+3. Optional: put sound effects into `<editing folder>/SFX/<kind>/` (whoosh, pop, riser, impact, ding,
+   click, magic, glitch, minecraft) and ask Claude to "index the SFX library".
+
+Then tell them how to use it, e.g.: open Claude Code in a project folder and say "תערוך לי את ההקלטה הזאת
+לסרטון מיינקראפט", "תעשה שורט מהקריינות הזאת", "תוסיף סאונד אפקטים", "קרא הערות" (after leaving markers
+with comments on the Premiere timeline).
+
+## Updating later
+`cd <repo> && git pull && uv run python setup/install_skills.py` (re-run the installer if dependencies changed).
