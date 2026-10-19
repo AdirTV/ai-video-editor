@@ -62,6 +62,23 @@ version, saves, renders, runs QA. Spec extras: clip `"effects": [{"name", "props
 (Film Impact Pop Motion), top `"transitions": [{"name", "track", "t", "dur"}]`, `"replaces"`, `"vo_lufs": -14`,
 `"music_fit"`, `"music_playlist"`, `"duck_music"`, `"auto_sfx"`.
 
+## 3b. Talking-head → vertical short (`mce.talkshort`)
+
+For a person talking to camera (often many retakes of the same lines): you pick the best take of each line
+from `transcript.md` (the last clean, complete take is usually the keeper; skip takes where the speaker looks
+down/reads — check frames), list them as `takes` in a config, and `uv run python -m mce.talkshort <config.json>`
+does the handwork: cuts pauses (word gaps **and** measured silences — ASR stretches words over pauses) and
+fillers, pre-masters the voice to a WAV (mic stream of multi-stream recordings), frames the face (`mce.faces`,
+cached) and changes punch-in level at every cut and every ~1.8 s inside long sentences (picture only, audio
+continuous), crossfades audio on alternating tracks, and writes `caps_props.json` for Remotion `Captions`.
+- `"layout": "split"` = stream-clip look (game/B-roll top half, face bottom, captions on the seam, `look: "stream"`,
+  font `carlito`). Shots without B-roll fall back to full-frame face. B-roll `"at"` takes a shot id from the printed
+  shot list (`"06a"`, `"06a+0.9"`); clips fill their shot and slow down (≥0.7×) if short; `zoom` hides letterboxing
+  (find bars with `cropdetect`), panels are cropped at the seam.
+- Pick B-roll by what is said (money → cash shots, "robbing a store" → robbery…). Find shot boundaries with
+  `select='gt(scene,0.3)'` so in/out never crosses a cut. Official trailers via `yt-dlp` (H.264) → CFR 60.
+- Order: config → talkshort → render captions (new filename each time) → talkshort again (picks up the .mov) → push.
+
 ## 4. Voiceover-driven shorts (script + recorded VO)
 
 1. Read the sequence the user cut: VO clips' in/out = final timing (`tl = src - inPoint + start`).
@@ -94,6 +111,8 @@ version, saves, renders, runs QA. Spec extras: clip `"effects": [{"name", "props
   In fcpxml plans: `"jump_cover": {"broll": [paths], "overlap": 0.12, "pre": 0.5, "post": 1.0}` does both
   (without B-roll files it drops a 🟡 B-ROLL marker on each jump). In multi-source specs, do it by hand.
   "Small details like this separate a noob from a professional."
+- **Never ship a render QA calls silent** (−70 LUFS): a Hard Limiter whose amplitude didn't verify once muted a whole
+  short; push now removes unverified limiters. Prefer pre-mastered voice (talkshort does it) over `limit_db`.
 - **Don't trust your ears for loudness** (laptop speakers lie; phones are where it's watched): measure.
   Target −14 LUFS integrated for YouTube, peaks under −2 dB. In Premiere that's a **Loudness Meter** (YouTube
   preset) and a **Hard Limiter** (Maximum Amplitude −2 dB) on the Mix track. The API can't add Mix-track effects,

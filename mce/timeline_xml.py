@@ -13,6 +13,7 @@ Spec (JSON), all times in seconds:
   ],
   "markers": [{"t": 1.2, "type": "fx", "note": "..."}]
 }
+Audio clips: "fade_in"/"fade_out" seconds (relative to gain_db) for crossfades at jump cuts.
 Scale is percent, x/y are the clip's center in sequence pixels (default: frame center).
 Stills (png/jpg) can use any in/out.
 """
@@ -106,9 +107,16 @@ def build(spec: dict) -> str:
         else:
             if speed != 1:
                 filters += _speed(speed * 100)
-            if c.get("gain_db") or c.get("gain_keys"):
+            if c.get("gain_db") or c.get("gain_keys") or c.get("fade_in") or c.get("fade_out"):
                 # gain_keys: [[seconds from clip start, dB], ...] (e.g. music ducking)
                 keys = [(c_in + round(t * cf), d) for t, d in c.get("gain_keys", [])]
+                if not keys and (c.get("fade_in") or c.get("fade_out")):
+                    # short fades relative to gain_db (jump-cut crossfades); -40 dB = silent
+                    g, ln = c.get("gain_db", 0), (c["out"] - c["in"]) / speed
+                    fi, fo = c.get("fade_in", 0), c.get("fade_out", 0)
+                    pts = ([(0, g - 40), (fi, g)] if fi else [(0, g)]) + \
+                          ([(ln - fo, g), (ln, g - 40)] if fo else [(ln, g)])
+                    keys = [(c_in + round(t * cf), d) for t, d in pts]
                 filters += _gain(c.get("gain_db", 0), keys)
         src = (f"<sourcetrack><mediatype>audio</mediatype><trackindex>{c.get('stream', 1)}</trackindex>"
                "</sourcetrack>") if kind == "audio" else ""

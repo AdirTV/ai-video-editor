@@ -5,7 +5,7 @@ description = "Minecraft auto-editor: analyze gameplay recordings and export Pre
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "whisperx==3.8.6",
-    "opencv-python-headless>=4.10",
+    "opencv-python-headless>=4.10,<5",  # 5.x removed CascadeClassifier (face detection)
     "numpy",
     "librosa>=1.0.0",
 ]

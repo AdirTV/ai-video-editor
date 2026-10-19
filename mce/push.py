@@ -92,9 +92,14 @@ def push(spec_path: str, export: str | None = None) -> None:
                 for cl in t_["clips"]:
                     call("apply_audio_effect", {"node_id": cl["nodeId"], "effect_name": "Hard Limiter"},
                          f"Hard Limiter → {cl['name']}")
-                    call("set_effect_property", {"node_id": cl["nodeId"], "effect_name": "Hard Limiter",
-                                                 "property_name": "Maximum Amplitude", "value": spec["limit_db"]},
-                         f"  Maximum Amplitude={spec['limit_db']} dB")
+                    res = call("set_effect_property", {"node_id": cl["nodeId"], "effect_name": "Hard Limiter",
+                                                       "property_name": "Maximum Amplitude", "value": spec["limit_db"]},
+                               f"  Maximum Amplitude={spec['limit_db']} dB")
+                    if not _ok(res):
+                        # a limiter left at an unverified amplitude silenced a whole render (2026-10-19):
+                        # take it off again and rely on the pre-mastered voice + QA's true-peak check
+                        call("remove_effect_by_name", {"node_id": cl["nodeId"], "effect_name": "Hard Limiter"},
+                             f"  removed unverified Hard Limiter → {cl['name']}")
         for tr in spec.get("transitions", []):
             call("add_transition", {"transition_name": tr["name"], "track_index": tr.get("track", 0),
                                     "cut_point_seconds": tr["t"], "duration_seconds": tr.get("dur", 0.25)},
