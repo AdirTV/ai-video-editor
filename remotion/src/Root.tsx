@@ -13,6 +13,8 @@ import { YouTubeCard } from "./ice/YouTubeCard";
 import { Advancement } from "./japan/Advancement";
 import { RouteMap } from "./japan/RouteMap";
 import { SpeedrunTimer } from "./japan/SpeedrunTimer";
+import { FlightMap } from "./japan/FlightMap";
+import { ItemTooltip } from "./japan/ItemTooltip";
 
 // duration from a "seconds" prop
 const bySeconds = ({ props }: { props: { seconds?: number } }) => ({ durationInFrames: Math.ceil((props.seconds ?? 1) * 60) });
@@ -62,6 +64,14 @@ export const RemotionRoot: React.FC = () => {
           { label: "יציאה מהמלון", at: 0 }, { label: "לוסון", at: 134 }, { label: "מטרו", at: 422 },
           { label: "מונורייל", at: 1125 }, { label: "אודאיבה", at: 2563 }, { label: "דייברסיטי", at: 2903 },
           { label: "חנות מיינקראפט", at: 3083 } ] }}
+        calculateMetadata={bySeconds} />
+      <Composition id="FlightMap" component={FlightMap} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ seconds: 2.6 }} calculateMetadata={bySeconds} />
+      <Composition id="ItemTooltip" component={ItemTooltip} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ seconds: 3, lines: [
+          { text: "לגו אנדר דרגון" },
+          { text: "", count: 15980, prefix: "¥", color: "#FFAA00", at: 0.3 },
+          { text: "≈ 309 ₪", color: "#55FF55", at: 1.1 } ] }}
         calculateMetadata={bySeconds} />
     </>
   );

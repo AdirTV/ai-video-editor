@@ -13,6 +13,8 @@ Edit plan (JSON):
   "segments": [{"in": 12.0, "out": 40.5, "speed": 1, "keep_audio": true, "note": "...",
                 "j": 0.3,     # J-cut: this segment's audio starts 0.3 s before its picture
                 "l": 0.5}],   # L-cut: this segment's audio continues 0.5 s over the next picture
+  "jump_cover": {"overlap": 0.12, "broll": ["/abs/b1.mp4"], "pre": 0.5, "post": 1.0},
+                # cuts inside one take: overlapped audio on alternating tracks + B-roll on top
   "markers": [{"src": 123.4, "type": "broll", "note": "...", "dur": 0}]
 }
 Marker times are source seconds; they land on the timeline wherever that
@@ -131,7 +133,7 @@ def build(plan: dict, info: MediaInfo) -> str:
     game_off = {"facecam_left": half_off, "facecam_right": -half_off}.get(layout, 0.0)
     cam_off = -game_off
 
-    tracks: dict[str, list[str]] = {"v1": [], "v2": [], "a1": [], "a2": []}
+    tracks: dict[str, list[str]] = {"v1": [], "v2": [], "v3": [], "a1": [], "a2": [], "a3": [], "a4": []}
     mapping = []  # (src_in, src_out, tl_start, speed) for marker placement
     tl = 0
     # J/L cuts: the audio boundary between segment k and k+1 moves by
@@ -143,6 +145,23 @@ def build(plan: dict, info: MediaInfo) -> str:
         a_, b_ = segs[k - 1], segs[k]
         if float(a_.get("speed", 1) or 1) == 1 and float(b_.get("speed", 1) or 1) == 1:
             shifts[k] = float(a_.get("l", 0)) - float(b_.get("j", 0))
+
+    # Jump-cut cover (a pro editor's tip): where a chunk was cut out of one continuous
+    # take, (1) the audio of the two sides goes on alternating tracks and overlaps
+    # by `overlap` s each way with short fades, so the jump isn't heard, and (2) a
+    # B-roll shot covers the cut from `pre` s before to `post` s after, so it isn't seen.
+    cover = plan.get("jump_cover")
+    cover = {} if cover is True else (cover or None)
+    jump = [False] * (len(segs) + 1)  # jump[n] = jump cut after segment n
+    if cover is not None:
+        for k in range(1, len(segs)):
+            a_, b_ = segs[k - 1], segs[k]
+            if (float(a_.get("speed", 1) or 1) == 1 and float(b_.get("speed", 1) or 1) == 1
+                    and not a_.get("l") and not b_.get("j") and abs(b_["in"] - a_["out"]) > 0.05):
+                jump[k] = True
+    ov = round(float((cover or {}).get("overlap", 0.12)) * fps)
+    lane = 0  # flips at every jump cut: audio alternates between track pairs
+    jump_cuts_tl: list[float] = []
 
     for n, seg in enumerate(plan["segments"], 1):
         speed = float(seg.get("speed", 1) or 1)
@@ -156,11 +175,15 @@ def build(plan: dict, info: MediaInfo) -> str:
         name = escape(seg.get("note") or f"seg {n}")
         ids = {k: f"{k}-{n}" for k in tracks}
         keep_audio = seg.get("keep_audio", speed == 1)
-        active = ["v1"] + (["v2"] if layout != "none" else []) + (["a1", "a2"] if keep_audio else [])
+        if n > 1 and jump[n - 1]:
+            lane ^= 1
+            jump_cuts_tl.append(start / fps)
+        mic_key, game_key = ("a3", "a4") if lane else ("a1", "a2")
+        active = ["v1"] + (["v2"] if layout != "none" else []) + ([mic_key, game_key] if keep_audio else [])
         links = "".join(
             f"<link><linkclipref>{ids[k]}</linkclipref>"
             f"<mediatype>{'video' if k.startswith('v') else 'audio'}</mediatype>"
-            f"<trackindex>{1 if k in ('v1', 'a1') else 2}</trackindex><clipindex>{n}</clipindex></link>"
+            f"<trackindex>{int(k[1])}</trackindex><clipindex>{n}</clipindex></link>"
             for k in active
         )
         speed_f = _speed(speed * 100) if speed != 1 else ""
@@ -188,17 +211,62 @@ def build(plan: dict, info: MediaInfo) -> str:
             # values trim this segment's audio to make room for the neighbour's).
             lead = round(-shifts[n - 1] * fps) if n > 1 else 0
             tail = round(shifts[n] * fps)
+            jin, jout = n > 1 and jump[n - 1], jump[n]
+            lead += ov if jin else 0   # overlap into the previous take's audio
+            tail += ov if jout else 0  # and into the next one's
             lead = max(-dur + 1, min(lead, c_in))           # needs source handle before in
             tail = max(-dur + 1, min(tail, total - c_out))  # and after out
-            for key, stream, gain in (("a1", streams.get("mic", 0), 0), ("a2", streams.get("game", 1), game_db)):
+            for key, stream, gain in ((mic_key, streams.get("mic", 0), 0), (game_key, streams.get("game", 1), game_db)):
                 if stream is None or stream >= len(info.audio_streams):
                     continue
                 src_track = (f"<sourcetrack><mediatype>audio</mediatype>"
                              f"<trackindex>{stream + 1}</trackindex></sourcetrack>")
-                tracks[key].append(item(key, src_track, _gain(gain) if gain else "", lead, tail))
+                fade = []
+                if jin:   # fade in across the overlap
+                    fade += [(c_in - lead, gain - 30), (c_in - lead + 2 * ov, gain)]
+                if jout:  # fade out across the overlap
+                    fade += [(c_out + tail - 2 * ov, gain), (c_out + tail, gain - 30)]
+                lvl = _gain(gain, fade) if (gain or fade) else ""
+                tracks[key].append(item(key, src_track, lvl, lead, tail))
         tl = end
 
     markers = []
+    broll_files = (cover or {}).get("broll") or []
+    pre, post = float((cover or {}).get("pre", 0.5)), float((cover or {}).get("post", 1.0))
+    broll_defs: dict[str, dict] = {}
+    for i, cut in enumerate(jump_cuts_tl):
+        a_t, b_t = max(0.0, cut - pre), min(tl / fps, cut + post)
+        if not broll_files:
+            f = round(cut * fps)
+            markers.append(f"<marker><name>{escape(MARKER_LABELS.get('broll', 'B-ROLL'))}</name>"
+                           f"<comment>{escape(f'jump cut — cover {a_t:.2f}–{b_t:.2f}s with B-roll')}</comment>"
+                           f"<in>{f}</in><out>-1</out></marker>")
+            continue
+        from .timeline_xml import _probe
+        path = broll_files[i % len(broll_files)]
+        info_b = broll_defs.setdefault(path, {**_probe(path), "id": f"broll-{len(broll_defs) + 1}", "written": False})
+        bfps = info_b.get("fps") or fps
+        length = b_t - a_t
+        mid = max(0.0, info_b["duration"] / 2 - length / 2)
+        b_in, b_dur = round(mid * bfps), round(length * fps)
+        btb = round(bfps)
+        brate = f"<rate><timebase>{btb}</timebase><ntsc>{'TRUE' if abs(bfps - btb) > 0.01 else 'FALSE'}</ntsc></rate>"
+        if info_b["written"]:
+            fref = f'<file id="{info_b["id"]}"/>'
+        else:
+            info_b["written"] = True
+            pb = Path(path).resolve()
+            fref = (f'<file id="{info_b["id"]}"><name>{escape(pb.name)}</name><pathurl>file://{quote(str(pb))}</pathurl>'
+                    f"{brate}<duration>{round(info_b['duration'] * bfps)}</duration><media><video><samplecharacteristics>"
+                    f"{brate}<width>{info_b['width']}</width><height>{info_b['height']}</height></samplecharacteristics>"
+                    f"</video></media></file>")
+        sc = max(SEQ_W / info_b["width"], SEQ_H / info_b["height"]) * 100
+        tracks["v3"].append(
+            f'<clipitem id="v3-b{i + 1}"><name>B-roll (jump cut)</name><enabled>TRUE</enabled>'
+            f"<duration>{round(info_b['duration'] * bfps)}</duration>{brate}"
+            f"<start>{round(a_t * fps)}</start><end>{round(a_t * fps) + b_dur}</end>"
+            f"<in>{b_in}</in><out>{b_in + round(length * bfps)}</out>{fref}{_motion(sc, 0, 0)}</clipitem>")
+
     for m in plan.get("markers", []):
         t = _src_to_tl(m["src"], mapping)
         if t is None:
@@ -212,8 +280,10 @@ def build(plan: dict, info: MediaInfo) -> str:
         extra = "<outputchannelindex>1</outputchannelindex>" if audio else ""
         return f"<track>{''.join(items)}<enabled>TRUE</enabled><locked>FALSE</locked>{extra}</track>"
 
-    video = track(tracks["v1"]) + (track(tracks["v2"]) if tracks["v2"] else "")
-    audio = track(tracks["a1"], True) + track(tracks["a2"], True)
+    video = track(tracks["v1"]) + (track(tracks["v2"]) if tracks["v2"] or tracks["v3"] else "") \
+        + (track(tracks["v3"]) if tracks["v3"] else "")
+    audio = track(tracks["a1"], True) + track(tracks["a2"], True) \
+        + ((track(tracks["a3"], True) + track(tracks["a4"], True)) if tracks["a3"] or tracks["a4"] else "")
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n<xmeml version="4">'
         f'<sequence id="sequence-1"><name>{escape(plan.get("name", "auto edit"))}</name>'

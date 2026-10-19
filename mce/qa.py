@@ -17,7 +17,7 @@ import cv2
 import numpy as np
 from .i18n import t
 
-TARGET_LUFS, MAX_TP = -14.0, -1.0
+TARGET_LUFS, MAX_TP = -14.0, -2.0  # YouTube target; peaks kept under -2 dB (Hard Limiter tip)
 
 
 def _ff(args: list[str]) -> str:
@@ -48,6 +48,8 @@ def check_render(path: str) -> list[str]:
         i = float(lufs[-1])
         mark = "✅" if abs(i - TARGET_LUFS) <= 1.5 else "🟡"
         issues.append(t("lufs", mark=mark, i=i, target=TARGET_LUFS))
+        if abs(i - TARGET_LUFS) > 1.5:
+            issues.append(t("lufs_fix", d=TARGET_LUFS - i))
     if tp:
         p = float(tp[-1])
         issues.append(t("peak", mark='✅' if p <= MAX_TP else '🔴', p=p, max=MAX_TP))

@@ -64,7 +64,7 @@ cfg.parent.mkdir(exist_ok=True)
 cfg.write_text(json.dumps({"editing_root": root, "sfx_lib": root.rstrip("/") + "/SFX", "language": language,
                            "profile": "general", "minecraft": mc}, ensure_ascii=False))
 lib = Path(root).expanduser() / "SFX"
-for k in ["whoosh", "pop", "riser", "impact", "ding", "click", "magic", "glitch"] + (["minecraft"] if mc else []):
+for k in ["whoosh", "pop", "beep", "click", "shutter", "typing", "riser", "impact", "ding", "magic", "glitch"] + (["minecraft"] if mc else []):
     (lib / k).mkdir(parents=True, exist_ok=True)
 print("settings:", cfg, "| SFX library:", lib)
 PY

@@ -11,6 +11,7 @@ Extra spec fields (see timeline_xml for the rest):
         -> songs back to back, crossfaded on alternating tracks (A fades out over B's entrance)
   top   "music_fit": {"hit": 2.417} -> start the song so a drop lands on that second (or true: best energy)
   top   "duck_music": true -> music lifts in speech pauses (or {"music_file", "under", "lift_db"})
+  top   "limit_db": -2     -> Hard Limiter (max amplitude) on every audio clip
   top   "vo_lufs": -14     -> gain the voiceover clips (file key "vo_file", default "vo") to this loudness
 
   uv run python -m mce.push <spec.json> [--export out.mp4]
@@ -81,6 +82,19 @@ def push(spec_path: str, export: str | None = None) -> None:
                     call("add_transition_to_clip", {"node_id": nid, "transition_name": "Pop Motion",
                                                     "position": clip["pop"], "duration_seconds": 0.25},
                          f"Pop Motion ({clip['pop']}) → {clip['name']}")
+        # Pro tip: a Hard Limiter at -2 dB maximum amplitude so nothing peaks. Premiere's
+        # API can't add effects to the Mix track, so it goes on every audio clip; QA then
+        # checks the true peak of the whole render.
+        if spec.get("limit_db") is not None:
+            aseq = json.loads(c.call("get_active_sequence", {"track_type": "audio", "clip_limit": 200}))
+            aseq = aseq.get("data", aseq)
+            for t_ in aseq.get("audioTracks", []):
+                for cl in t_["clips"]:
+                    call("apply_audio_effect", {"node_id": cl["nodeId"], "effect_name": "Hard Limiter"},
+                         f"Hard Limiter → {cl['name']}")
+                    call("set_effect_property", {"node_id": cl["nodeId"], "effect_name": "Hard Limiter",
+                                                 "property_name": "Maximum Amplitude", "value": spec["limit_db"]},
+                         f"  Maximum Amplitude={spec['limit_db']} dB")
         for tr in spec.get("transitions", []):
             call("add_transition", {"transition_name": tr["name"], "track_index": tr.get("track", 0),
                                     "cut_point_seconds": tr["t"], "duration_seconds": tr.get("dur", 0.25)},

@@ -10,7 +10,9 @@
     "@remotion/google-fonts": "4.0.535",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "remotion": "4.0.535"
+    "remotion": "4.0.535",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.535",

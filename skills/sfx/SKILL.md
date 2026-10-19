@@ -32,6 +32,18 @@ Commands (from `{{MCE_HOME}}`):
 
 Classification: Minecraft folders → `minecraft`; then filename keywords; then folder names; else `other`.
 
+## What sound goes where (rules from a pro editor — follow them)
+
+| On screen | Sound | How to mark it |
+|---|---|---|
+| Movement transition (whip, zoom, push, slide, spin) | **whoosh** | automatic from `transitions` |
+| Quick cut / flash | **mouse click** or **camera shutter** | automatic (Flash → shutter; `"name": "Cut"` → click), or `"sfx": "click"` on the transition |
+| Object/graphic appearing | **pop** (or **beep** for small UI-like things) | clip `"pop": "start"` / `"sfx": "beep"` |
+| Highlighting something | **sparkle** (magic/shimmer/glitter reveal) | clip `"emphasis": true` (`"emphasis_at"` s into the clip) |
+| Text appearing | **ASMR typing** for as long as it types on | clip `"text": true` (`"text_dur"` seconds) — generated from single keystrokes in `typing/` |
+
+Kinds in the library: whoosh, pop, beep, click, shutter, typing, riser, impact, ding, magic, glitch (+ minecraft, meme).
+
 ## Placing sounds on an edit
 
 Works on a `mce.timeline_xml` spec (see the video-edit skill). Mark intent on the spec:

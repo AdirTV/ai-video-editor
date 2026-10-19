@@ -11,6 +11,9 @@ A living file. Claude reads it before every edit. Every correction you make is a
 - **Sound**: the voice always on top; music under it, lifting in pauses; sound effects on transitions and pop-ins, not on every cut.
 - **Loudness**: −14 LUFS for YouTube.
 - **Vertical short (9:16)**: a 16:9 clip fills the frame (177.78%); if the whole frame matters, a smaller copy over a blurred fill — never black bars.
+- **Jump inside a take** (a chunk cut from mid-speech): overlapped audio on two tracks + B-roll over the cut — never leave a visible jump.
+- **Sound effects**: whoosh for movement transitions, click/camera shutter for quick cuts, pop for things appearing, sparkle for emphasis, typing as text types on.
+- **Don't trust your ears**: measure — Loudness Meter (−14 LUFS) and a Hard Limiter at −2 dB.
 - **Captions**: word by word or 2–4 words, one line, big, popping; key words coloured.
 
 ## Formats (examples — add your own)

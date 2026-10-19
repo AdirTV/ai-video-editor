@@ -16,6 +16,7 @@ MSG = {
     "freeze": ("🟡 תמונה קפואה {s:.2f}–{e:.2f}s (בסדר אם זה מכוון)", "🟡 Frozen picture {s:.2f}–{e:.2f}s (fine if intended)"),
     "lufs": ("{mark} עוצמה כוללת {i:.1f} LUFS (יעד יוטיוב {target:.0f})", "{mark} Integrated loudness {i:.1f} LUFS (YouTube target {target:.0f})"),
     "peak": ("{mark} שיא {p:.1f} dBTP (מקסימום {max:.0f})", "{mark} True peak {p:.1f} dBTP (max {max:.0f})"),
+    "lufs_fix": ("   → לתקן: לשנות את vo_lufs ב-{d:+.1f} dB ולבנות מחדש", "   → fix: change vo_lufs by {d:+.1f} dB and push again"),
     "silence": ("🟡 שקט מוחלט {s:.2f}–{e:.2f}s", "🟡 Dead air {s:.2f}–{e:.2f}s"),
     "v1_gap": ("🔴 חור ב-V1 בין {a:.2f} ל-{b:.2f}s", "🔴 Gap on V1 between {a:.2f} and {b:.2f}s"),
     "short_clip": ("🟡 קליפ קצר מאוד ({d:.2f}s) ב-V{t}: {name} @ {start:.2f}", "🟡 Very short clip ({d:.2f}s) on V{t}: {name} @ {start:.2f}"),

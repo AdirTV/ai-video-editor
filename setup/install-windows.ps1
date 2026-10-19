@@ -36,7 +36,7 @@ if (-not $Er -and -not $Yes) { $Er = Read-Host "Where do you keep your editing p
 if (-not $Er) { $Er = "$env:USERPROFILE\Desktop\editing" }
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.mce" | Out-Null
 @{ editing_root = $Er; sfx_lib = (Join-Path $Er "SFX"); language = $Language; profile = "general"; minecraft = (-not $NoMinecraft) } | ConvertTo-Json | Set-Content -Encoding UTF8 "$env:USERPROFILE\.mce\config.json"
-$kinds = @("whoosh","pop","riser","impact","ding","click","magic","glitch"); if (-not $NoMinecraft) { $kinds += "minecraft" }
+$kinds = @("whoosh","pop","beep","click","shutter","typing","riser","impact","ding","magic","glitch"); if (-not $NoMinecraft) { $kinds += "minecraft" }
 foreach ($k in $kinds) { New-Item -ItemType Directory -Force (Join-Path $Er "SFX\$k") | Out-Null }
 if (-not (Test-Path style.md)) { if ($Language -eq "en") { Copy-Item style.template.en.md style.md } else { Copy-Item style.template.md style.md } }
 if (-not (Test-Path vocab.txt)) { New-Item vocab.txt | Out-Null }

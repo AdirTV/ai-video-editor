@@ -86,6 +86,23 @@ version, saves, renders, runs QA. Spec extras: clip `"effects": [{"name", "props
 - Position keyframes must go through XML `keys` (MCP `add_keyframe` takes numbers only). Crop keyframes don't render
   on export — reposition instead.
 
+## 5b. Pro tips we follow (learned from editors' tutorials)
+
+- **Jump cuts inside one take** (a chunk was cut out of a continuous talking clip): never leave the visible jump —
+  (1) put the audio of the two sides on alternating tracks overlapping ~0.1 s each way with short fades, so the
+  jump isn't heard, and (2) cover the cut with a B-roll shot from ~0.5 s before to ~1 s after, so it isn't seen.
+  In fcpxml plans: `"jump_cover": {"broll": [paths], "overlap": 0.12, "pre": 0.5, "post": 1.0}` does both
+  (without B-roll files it drops a 🟡 B-ROLL marker on each jump). In multi-source specs, do it by hand.
+  "Small details like this separate a noob from a professional."
+- **Don't trust your ears for loudness** (laptop speakers lie; phones are where it's watched): measure.
+  Target −14 LUFS integrated for YouTube, peaks under −2 dB. In Premiere that's a **Loudness Meter** (YouTube
+  preset) and a **Hard Limiter** (Maximum Amplitude −2 dB) on the Mix track. The API can't add Mix-track effects,
+  so: spec `"limit_db": -2` puts a Hard Limiter on every audio clip, `"vo_lufs"` sets the voice level, and QA
+  measures the render (integrated LUFS + true peak, tells you how much to change vo_lufs). Suggest the user also
+  keeps Loudness Meter + Hard Limiter on the Mix track of their sequence template.
+- **Sound effects** follow what happens on screen (see the `sfx` skill): whoosh for movement transitions, mouse
+  click / camera shutter for quick cuts, pop/beep for things appearing, sparkle for emphasis, ASMR typing as text types on.
+
 ## 6. Review loop (every time, before the user sees anything)
 
 `mce.push --export` runs QA (black frames, frozen picture, −14 LUFS / −1 dBTP, dead air, V1 gaps, flash-short clips,
