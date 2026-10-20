@@ -41,4 +41,13 @@ not a list of achievements.
 - Graphics (Remotion): `Advancement` (real Minecraft advancement toast; `lang: "en"` → "Advancement Made!"),
   `YouDied`, `Frost`, `LightMeter`, `RouteMap`, `Morph` (one mob turns into another).
 - Official footage for news/update videos: Minecraft's YouTube channel (yt-dlp, H.264), Mojang's articles.
-  Trailer music can trigger Content ID — use your own music under trailer footage.
+  Trailer music can trigger Content ID — use your own music under trailer footage. `mce.stems` strips the music
+  and keeps the trailer's game sounds/dialogue (`no_vocals` = music+SFX, so for "SFX without music" use
+  `--stems all` and keep `other` + `drums` only where they're game sounds — listen first).
+- Shot lists of trailers / Minecraft Live segments: `mce.scenes` (adaptive detector) — exact cuts even though the
+  camera is always moving; pick B-roll inside one shot.
+- Own gameplay: `mce.scenes` on a continuous recording finds hard visual changes, not "shots" — death screen,
+  portal/dimension change, teleport, loading/menu screens, alt-tab. Useful as extra markers; the mouse-look motion
+  doesn't trigger it with `adaptive` (use `content` only on edited footage). For a 3840×1080 facecam recording the
+  facecam half dilutes it — run it on the gameplay half if you need precision (crop first with ffmpeg).
+- Single-track recordings (voice and game mixed): `analyze --separate`.

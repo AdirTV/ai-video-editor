@@ -33,6 +33,14 @@ cd {{MCE_HOME}} && uv run python -m mce.cli analyze "<video>" [--mic 0 --game 1]
   evidence — you cannot hear, a laugh is how you know it was funny. Loudness spikes alone are weak.
 - Transcription: Hebrew → ivrit.ai model; other languages → Whisper large-v3-turbo; `auto` detects. Add names/terms
   the speaker uses to `vocab.txt` (one per line) to bias spelling.
+- `--separate`: voice and game/music are mixed in **one** audio stream (phone/camera clips, single-track OBS,
+  someone else's video, a podcast with a music bed) → Demucs splits them first; transcript, laughs/screams and
+  speech run on the clean voice, game-sound events on the rest. Stems land in `<analysis>/audio/stems/`
+  (`timeline.json` → `stems`) — use `vocals.wav` as a clean dialogue track in the edit. Not needed when mic and game
+  are already separate streams.
+- `--speakers auto|N` (podcasts, interviews, 2+ people): labels who speaks — `transcript.md` lines get `S1:`/`S2:`,
+  `transcript.json` segments/words get `speaker`. Needs `hf_token` in `~/.mce/config.json` (free Hugging Face
+  account that accepted the pyannote/speaker-diarization-community-1 terms); without it the tool says so and stops.
 
 ## 2. Understand → paper edit → approval
 
@@ -76,7 +84,7 @@ continuous), crossfades audio on alternating tracks, and writes `caps_props.json
   shot list (`"06a"`, `"06a+0.9"`); clips fill their shot and slow down (≥0.7×) if short; `zoom` hides letterboxing
   (find bars with `cropdetect`), panels are cropped at the seam.
 - Pick B-roll by what is said (money → cash shots, "robbing a store" → robbery…). Find shot boundaries with
-  `select='gt(scene,0.3)'` so in/out never crosses a cut. Official trailers via `yt-dlp` (H.264) → CFR 60.
+  `mce.scenes` (section 5c) so in/out never crosses a cut. Official trailers via `yt-dlp` (H.264) → CFR 60.
 - Talking-head shorts (see style.md): split 40/60 (`split_ratio`), top = a *literal* picture of what is said;
   captions **white, one line, same size** (`look: "stream"`): **on the seam while the screen is split, lower third
   (`top` ≈1460) otherwise** — never moving mid-phrase. the user rejected 2-line karaoke. Keep headroom tight (`full_target_y` ≈620, `low_face_y` ≈0.30).
@@ -146,6 +154,42 @@ to the speaker, occluded/odd-size boxes dropped, smoothed) → position keyframe
   keeps Loudness Meter + Hard Limiter on the Mix track of their sequence template.
 - **Sound effects** follow what happens on screen (see the `sfx` skill): whoosh for movement transitions, mouse
   click / camera shutter for quick cuts, pop/beep for things appearing, sparkle for emphasis, ASMR typing as text types on.
+
+## 5c. Extra tools (stems, shots, cutouts, Lottie)
+
+All `cd {{MCE_HOME}} && uv run python -m mce.<tool> …`; each prints its usage with `-h`.
+
+- **Stems — `mce.stems <media> [--stream N] [--start S --end E] [--stems voice|all]`** (Demucs, ~8× real time):
+  `vocals.wav` + `no_vocals.wav` (or vocals/drums/bass/other), same timing as the source so they sit 1:1 under it.
+  Uses: kill a trailer's music and keep its dialogue/SFX (Content ID; put our own music under it); remove the
+  narrator from B-roll; a clean dialogue track when the voice is buried in game noise; lift the voice and duck the game
+  separately; an a-cappella/instrumental of a song for a beat drop. Listen to the stems (or QA-measure) — artefacts
+  show on heavy distortion.
+- **Shots — `mce.scenes <video> [--start S --end E] [--detector adaptive|content|fade] [--json out.json]`**
+  (PySceneDetect, ~15-30× real time): shot list with exact cut times. Use for B-roll in/out from trailers and news
+  footage (never cross a cut), splitting a montage or VOD into shots, finding someone else's jump cuts.
+  `adaptive` (default) ignores steady camera motion — right for games and handheld; `content` catches more (fast
+  whip-pans too); `fade` finds fades to black. Shots shorter than `--min-len` (0.5 s) merge into neighbours.
+- **Subject cutout — `mce.matte <video> --start S --end E [--point x,y] [--neg x,y] [--box x0,y0,x1,y1]`**
+  (SAM 2 video, ~3 frames/s on Apple Silicon → keep it to the seconds you need): ProRes 4444 with alpha of the
+  subject alone, at the source size/fps, starting at `--start`. No prompt = the main person (biggest, most central);
+  for a game character/object give a point or box in source pixels (look at a frame first). `--mask` writes a
+  black/white matte instead (Premiere Track Matte Key).
+  - **Text behind the subject**: V1 the shot · V2 the text (Remotion `BigText`/`Sticker`, alpha .mov) · V3 the
+    cutout — same timeline start as the V1 piece with in = (V1 in − S), and the **same** scale/x/y/keys as V1 so it
+    lines up. The words look like they're behind the person. Big, bold words, 1–3 per beat; works best when the
+    subject is in the lower/middle of frame and the text sits behind the head/shoulders.
+  - Also: background blur/darken/replace behind a talking head (V1 effected copy, V2 cutout), a glow/outline on the
+    subject, the subject breaking out of a frame/card.
+  - Check the cutout on a coloured background before using it (edges, lost hands/hair, a second person grabbed);
+    add `--point`/`--neg` and rerun if wrong.
+- **Lottie animations — Remotion `LottieFx`**: ready-made animated stickers/icons with alpha.
+  `npx remotion render LottieFx out.mov --props='{"emoji":"😂","size":420,"x":540,"y":700,"seconds":2}' …(alpha flags)`.
+  `emoji` = any Noto animated emoji (no download; 😂🔥💀😱🤯👀💯🎉❤️…); `src` = a LottieFiles animation fetched with
+  `uv run python -m mce.lottie <url.json|url.lottie> <name>` → `"src": "lottie/<name>.json"` (`--list` shows the
+  library). Props: `size`, `x`/`y` (centre px), `loop`, `speed`, `pop` (pop in/out, default on), `rotate`.
+  Use for reactions next to a face, arrows/circles pointing at something, subscribe/like animations, icons
+  (money, alarm, check/cross) — small and short (1–2 s), timed to the word, with a matching SFX.
 
 ## 6. Review loop (every time, before the user sees anything)
 

@@ -22,6 +22,11 @@ def extract(src: str, stream: int, out: str) -> None:
     )
 
 
+def to_mono16k(path: str, out: str) -> None:
+    """Any audio file → the 16 kHz mono wav the detectors and ASR expect."""
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", path, "-ac", "1", "-ar", str(SR), out], check=True)
+
+
 def load(path: str) -> np.ndarray:
     with wave.open(path) as w:
         raw = w.readframes(w.getnframes())

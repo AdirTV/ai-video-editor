@@ -39,19 +39,32 @@ def analyze(args) -> None:
     game_i = args.game if args.game is not None else (1 if len(info.audio_streams) > 1 else None)
     (out / "audio").mkdir(exist_ok=True)
     mic_wav = out / "audio" / "mic.wav"
-    audio.extract(src, mic_i, str(mic_wav))
+    game_from_stems, st = False, None
+    if args.separate:
+        # Voice and game/music share one stream: split them so transcription, laughs and game sounds
+        # each get a clean signal.
+        from . import stems
+        _log("separating voice from game/music (demucs)…")
+        st = stems.separate(src, out / "audio" / "stems", stream=mic_i)
+        audio.to_mono16k(st["vocals"], str(mic_wav))
+        if game_i is None:
+            game_from_stems = True
+            audio.to_mono16k(st["no_vocals"], str(out / "audio" / "game.wav"))
+    else:
+        audio.extract(src, mic_i, str(mic_wav))
     mic_db = audio.envelope(audio.load(str(mic_wav)))
     speech = audio.speech_segments(mic_db)
     excite = audio.excitement(mic_db, speech)
     game = []
-    if game_i is not None:
+    if game_i is not None or game_from_stems:
         game_wav = out / "audio" / "game.wav"
-        audio.extract(src, game_i, str(game_wav))
+        if not game_from_stems:
+            audio.extract(src, game_i, str(game_wav))
         game = audio.game_events(audio.envelope(audio.load(str(game_wav))))
     _log(f"audio: {len(speech)} speech segments, {len(excite)} excited, {len(game)} game spikes")
     from . import events
     sounds = events.detect(str(mic_wav), groups=["laugh", "scream", "gasp"])
-    if game_i is not None:
+    if game_i is not None or game_from_stems:
         sounds += events.detect(str(out / "audio" / "game.wav"), groups=["explosion"])
     _log(f"sound events: " + ", ".join(f"{k} {sum(e['kind'] == k for e in sounds)}"
                                         for k in ("laugh", "scream", "gasp", "explosion")))
@@ -71,6 +84,12 @@ def analyze(args) -> None:
         segments = tr.transcribe(str(mic_wav), prompt=prompt, language=lang)
         _save(seg_path, segments)
         _log(f"language: {tr.LAST_LANGUAGE}")
+    if args.speakers and not any("speaker" in s for s in segments):
+        from . import transcribe as tr
+        _log("diarizing speakers…")
+        segments = tr.diarize(str(mic_wav), segments, None if args.speakers == "auto" else int(args.speakers))
+        _save(seg_path, segments)
+        _log("speakers: " + ", ".join(sorted({s["speaker"] for s in segments if "speaker" in s})))
     # Reports and labels follow the language actually spoken.
     from .i18n import guess, set_lang
     set_lang(guess(" ".join(s["text"] for s in segments)) if segments else args.language)
@@ -86,11 +105,12 @@ def analyze(args) -> None:
 
     tl = timeline.build(info.duration, speech, excite, game, segments, samples, sounds)
     tl.update({"source": src, "layout": layout, "fps": info.fps_float,
-               "audio": {"mic": mic_i, "game": game_i}, "width": info.width, "height": info.height})
+               "audio": {"mic": mic_i, "game": game_i}, "stems": st, "width": info.width, "height": info.height})
     _save(out / "timeline.json", tl)
     (out / "timeline.md").write_text(timeline.to_markdown(tl, segments, samples))
     (out / "transcript.md").write_text("\n".join(
-        f"[{sheets.fmt(s['start'])}] {s['text']}" for s in segments) + "\n")
+        f"[{sheets.fmt(s['start'])}]" + (f" {s['speaker']}:" if "speaker" in s else "") + f" {s['text']}"
+        for s in segments) + "\n")
 
     sheets.overview(out / "thumbs", info.duration, out / "sheets")
     for h in sorted(tl["highlights"], key=lambda h: -h["score"])[:20]:
@@ -126,6 +146,9 @@ def main() -> None:
     a.add_argument("--game", type=int, help="audio stream index of game sound")
     a.add_argument("--layout", default="auto", choices=["auto", "none", "facecam_left", "facecam_right"])
     a.add_argument("--retranscribe", action="store_true")
+    a.add_argument("--separate", action="store_true",
+                   help="voice and game/music are mixed in one stream: split them with demucs first")
+    a.add_argument("--speakers", help="label who speaks (diarization): auto or a number; needs hf_token")
     a.add_argument("--language", default=LANGUAGE, help="he | en | auto (default from ~/.mce/config.json)")
     a.add_argument("--profile", default=PROFILE, choices=["general", "minecraft"],
                    help="minecraft adds HUD detection (health, menus, death screen)")

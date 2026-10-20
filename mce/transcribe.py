@@ -5,7 +5,7 @@ language uses Whisper large-v3-turbo. language="auto" detects it from the audio.
 """
 import gc
 
-from .config import LANGUAGE, PROFILE
+from .config import HF_TOKEN, LANGUAGE, PROFILE
 
 MODELS = {"he": "ivrit-ai/whisper-large-v3-turbo-ct2"}
 DEFAULT_MODEL = "large-v3-turbo"
@@ -67,3 +67,32 @@ def transcribe(wav_path: str, prompt: str | None = None, batch_size: int = 8,
         segments.append({"start": round(seg["start"], 2), "end": round(seg["end"], 2),
                          "text": seg["text"].strip(), "words": words})
     return segments
+
+
+DIARIZE_MODEL = "pyannote/speaker-diarization-community-1"
+
+
+def diarize(wav_path: str, segments: list[dict], speakers: int | None = None) -> list[dict]:
+    """Label who speaks: adds "speaker" ("S1", "S2"… in order of first appearance) to segments and words.
+
+    Needs a free Hugging Face token (config `hf_token`, env HF_TOKEN or `hf auth login`) whose account
+    accepted the terms of pyannote/speaker-diarization-community-1 on huggingface.co.
+    """
+    import torch
+    import whisperx
+    from whisperx.diarize import DiarizationPipeline, assign_word_speakers
+
+    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    try:
+        pipe = DiarizationPipeline(DIARIZE_MODEL, token=HF_TOKEN, device=device)
+    except Exception as e:  # gated model: no token / terms not accepted
+        raise SystemExit(f"diarization unavailable ({e.__class__.__name__}): accept the terms at "
+                         f"https://huggingface.co/{DIARIZE_MODEL} and set hf_token in ~/.mce/config.json") from e
+    df = pipe(whisperx.load_audio(wav_path), num_speakers=speakers)
+    out = assign_word_speakers(df, {"segments": segments}, fill_nearest=True)["segments"]
+    names: dict[str, str] = {}
+    for seg in out:
+        for x in [seg, *seg.get("words", [])]:
+            if "speaker" in x:
+                x["speaker"] = names.setdefault(x["speaker"], f"S{len(names) + 1}")
+    return out

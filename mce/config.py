@@ -5,6 +5,7 @@ Read from ~/.mce/config.json (written by the installer), overridable with env va
   sfx_lib       MCE_SFX_LIB       sound-effects library    (default <editing_root>/SFX)
   language      MCE_LANGUAGE      "he" | "en" | "auto"     (default auto: detected from the audio)
   profile       MCE_PROFILE       "general" | "minecraft"  (default general; minecraft adds HUD detection)
+  hf_token      HF_TOKEN          Hugging Face token       (only for speaker diarization: --speakers)
 """
 import json
 import os
@@ -18,6 +19,7 @@ _cfg = json.loads(_cfg_path.read_text()) if _cfg_path.exists() else {}
 EDITING_ROOT = Path(os.environ.get("MCE_EDITING_ROOT") or _cfg.get("editing_root") or Path.home() / "Desktop" / "editing").expanduser()
 LANGUAGE = (os.environ.get("MCE_LANGUAGE") or _cfg.get("language") or "auto").lower()
 PROFILE = (os.environ.get("MCE_PROFILE") or _cfg.get("profile") or "general").lower()
+HF_TOKEN = os.environ.get("HF_TOKEN") or _cfg.get("hf_token")  # None → huggingface-cli login cache
 SFX_LIB = Path(os.environ.get("MCE_SFX_LIB") or _cfg.get("sfx_lib") or EDITING_ROOT / "SFX").expanduser()
 
 

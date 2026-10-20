@@ -8,6 +8,7 @@ import { Alarm } from "./ice/Alarm";
 import { Frost } from "./ice/Frost";
 import { LightMeter } from "./ice/LightMeter";
 import { Sticker } from "./ice/Sticker";
+import { LottieFx } from "./fx/LottieFx";
 import { YouDied } from "./ice/YouDied";
 import { YouTubeCard } from "./ice/YouTubeCard";
 import { Advancement } from "./japan/Advancement";
@@ -45,6 +46,8 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{ text: "זהירות!", seconds: 1.2 }} calculateMetadata={bySeconds} />
       <Composition id="Sticker" component={Sticker} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ text: "חדש!", bg: "#6FC8FF", seconds: 1.2 }} calculateMetadata={bySeconds} />
+      <Composition id="LottieFx" component={LottieFx} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ emoji: "😂", size: 420, seconds: 2 }} calculateMetadata={bySeconds} />
       <Composition id="YouTubeCard" component={YouTubeCard} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ seconds: 4.58, thumb: "ice/thumb.png", title: "כל הדברים החדשים במיינקראפט לייב 2026!",
           channel: "אדיר טיוי", meta: "הועלה עכשיו", tapAt: 2.43 }} calculateMetadata={bySeconds} />

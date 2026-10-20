@@ -14,8 +14,8 @@ transitions, captions, graphics, music and sound effects, and render a check.
 | | |
 |---|---|
 | **Premiere bridge** | [premiere-pro-mcp](https://github.com/leancoderkavy/premiere-pro-mcp) (open source, MIT) + a redesigned panel inside Premiere |
-| **Editing tools** (`mce/`) | transcription in English/Hebrew/any language (auto-detected), recording analysis (laughs, screams, strongest moments), forced alignment of scripts, sequence builders, J/L cuts, automatic sound effects, music (smart starts/endings, drops on cue, crossfades between songs), loudness, quality checks |
-| **Graphics** (`remotion/`) | animated captions, CTAs, pop-up graphics — built in Remotion and layered into Premiere with transparency; text direction follows the language |
+| **Editing tools** (`mce/`) | transcription in English/Hebrew/any language (auto-detected), recording analysis (laughs, screams, strongest moments), forced alignment of scripts, sequence builders, J/L cuts, automatic sound effects, music (smart starts/endings, drops on cue, crossfades between songs), loudness, quality checks, voice/music/game separation (Demucs), speaker labels, shot detection (PySceneDetect), subject cutouts for text-behind-subject (SAM 2) |
+| **Graphics** (`remotion/`) | animated captions, CTAs, pop-up graphics, Lottie animations and animated emoji — built in Remotion and layered into Premiere with transparency; text direction follows the language |
 | **Skills** (`skills/`) | what teaches Claude how to edit: `video-edit` (general), `minecraft-edit` (Minecraft layer), `sfx` (sound effects) |
 
 ## Requirements
@@ -93,6 +93,7 @@ cd ~/ai-video-editor && git pull && uv run python setup/install_skills.py
 - premiere-pro-mcp — MIT, by leancoderkavy (installed from npm, not included here)
 - Remotion — free for individuals and companies of up to 3 people; beyond that a license is required ([remotion.pro](https://remotion.pro))
 - Hebrew transcription model — [ivrit.ai](https://huggingface.co/ivrit-ai); Whisper — OpenAI (MIT)
+- Demucs (MIT), PySceneDetect (BSD-3), SAM 2 and RT-DETR (Apache-2.0), Noto animated emoji (CC BY 4.0); speaker labels — pyannote (needs a Hugging Face account that accepted the model terms)
 - The videos, music and sounds you use are your responsibility (copyright, Content ID)
 
 ## Troubleshooting
