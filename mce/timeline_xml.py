@@ -24,6 +24,7 @@ from urllib.parse import quote
 from xml.sax.saxutils import escape
 
 from .fcpxml import MARKER_LABELS, _crop, _gain, _motion, _speed
+from .headroom import MAX_CLIP_DB, fit_gain
 
 STILL_EXT = {".png", ".jpg", ".jpeg", ".psd", ".tif", ".tiff"}
 STILL_DUR = 3600.0
@@ -48,6 +49,10 @@ def _probe(path: str) -> dict:
 
 
 def build(spec: dict) -> str:
+    # Premiere clamps XML audio levels at +6 dB (and shows a "Translation Report"): quiet sources get a
+    # pre-boosted copy instead of extra clip gain
+    for line in fit_gain(spec):
+        print("Headroom:", line)
     fps = int(spec.get("fps", 60))
     W, H = spec.get("width", 1080), spec.get("height", 1920)
     rate = f"<rate><timebase>{fps}</timebase><ntsc>FALSE</ntsc></rate>"
@@ -119,6 +124,9 @@ def build(spec: dict) -> str:
                     pts = ([(0, g - 40), (fi, g)] if fi else [(0, g)]) + \
                           ([(ln - fo, g), (ln, g - 40)] if fo else [(ln, g)])
                     keys = [(c_in + round(t * cf), d) for t, d in pts]
+                if max([c.get("gain_db", 0)] + [d for _, d in keys]) > MAX_CLIP_DB + 1e-6:
+                    raise ValueError(f"clip {c.get('name')} asks for more than +{MAX_CLIP_DB:g} dB — Premiere "
+                                     "would clamp it; fit_gain() should have handled it")
                 filters += _gain(c.get("gain_db", 0), keys)
         src = (f"<sourcetrack><mediatype>audio</mediatype><trackindex>{c.get('stream', 1)}</trackindex>"
                "</sourcetrack>") if kind == "audio" else ""

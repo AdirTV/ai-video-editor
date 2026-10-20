@@ -114,6 +114,8 @@ def build(plan: dict, info: MediaInfo) -> str:
     cam = {**CAM_DEFAULT, **plan.get("cam", {})}
     streams = plan.get("audio", {"mic": 0, "game": 1})
     game_db = plan.get("game_audio_db", -8)
+    if game_db > 6:  # Premiere clamps XML audio levels at +6 dB (Translation Report dialog)
+        raise ValueError(f"game_audio_db {game_db} > +6 dB — Premiere would clamp it; boost the source instead")
 
     file_written = False
 

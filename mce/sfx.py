@@ -92,6 +92,9 @@ def _analyze(path: Path) -> dict:
 # No single hit may peak above this (dBFS) after gain: loud transients (ice/glass/snowball impacts)
 # matched by RMS otherwise clip the mix (Ice Caves shorts hit +3.6 dBTP).
 PEAK_CEIL = -7.0
+# A sound whose loudest sample is below this is broken/empty (some pack files peak at -59 dBFS): never use
+# it — it would need +50 dB, which Premiere can't give (XML levels clamp at +6) and would only lift noise.
+SILENT_PEAK = -40.0
 
 
 @functools.lru_cache(maxsize=None)
@@ -296,8 +299,15 @@ def plan(spec: dict, lib: Path = LIB) -> tuple[dict, list[str]]:
             it = typing_track(float(forced.split(":")[1]), lib, seed=int(t * 100))
         else:
             it = by_path.get(forced) if forced else pick(kind)
+            tries = 0
+            while it and not forced and _sample_peak(it["path"]) < SILENT_PEAK and tries < 8:
+                it, tries = pick(kind), tries + 1   # auto pick landed on an empty file: take the next one
         if not it:
             missing.add(kind)
+            continue
+        if _sample_peak(it["path"]) < SILENT_PEAK:
+            report.append(f"!! {t:6.2f}s  {Path(it['path']).name} is near-silent "
+                          f"(peak {_sample_peak(it['path']):.0f} dBFS) — skipped, choose another sound")
             continue
         fid = "sfx_" + hashlib.md5(it["path"].encode()).hexdigest()[:8]
         files[fid] = {"path": it["path"]}

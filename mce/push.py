@@ -85,7 +85,15 @@ def push(spec_path: str, export: str | None = None) -> None:
                                  f"name (and \"replaces\": the old one)")
         except json.JSONDecodeError:
             pass
+        import time
+        t_import = time.time()
         call("import_fcp_xml", {"path": str(xml), "mode": "into_open_project"}, "import")
+        # Premiere writes a "FCP Translation Results <date>.txt" (and pops a dialog) when it had to change
+        # something on import — surface it instead of letting it hide in the bin
+        for rep in sorted((Path.home() / "Documents").glob("FCP Translation Results*.txt")):
+            if rep.stat().st_mtime >= t_import - 2:
+                text = rep.read_text(encoding="utf-8-sig", errors="replace").strip()
+                print(f"⚠️ Premiere translation report ({rep.name}):\n   " + text.replace("\n", "\n   "))
         call("set_active_sequence", {"sequence_id": spec["name"]}, f"activate {spec['name']}")
         seq = json.loads(c.call("get_active_sequence", {"track_type": "video", "clip_limit": 200}))
         seq = seq.get("data", seq)
