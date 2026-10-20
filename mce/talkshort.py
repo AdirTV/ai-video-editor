@@ -36,7 +36,9 @@ import re
 import subprocess
 from pathlib import Path
 
-from .faces import face_at, track
+import numpy as np
+
+from .faces import dense, face_at, motion, track
 from .timeline_xml import _probe
 
 W, H, FPS = 1080, 1920, 60
@@ -398,6 +400,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     # full_base > 177.8 (fill) leaves room to lift the face above captions that sit on the seam
     full_base, low_base = cfg.get("full_base", H / 1080 * 100), cfg.get("low_base", 140.0)  # bottom panel: face fills it
     prev = -1
+    locks: list[tuple[str, float]] = []
     xf = cfg.get("xfade", 0.04)
     for n, sh in enumerate(shots):
         c = cuts[sh["cut"]]
@@ -413,11 +416,34 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         pos = frame_face(face, b0 * punch[lvl] / 100, target, box)
         clip = {"file": "src", "start": sh["start"], "in": sh["in"], "out": sh["out"], **pos,
                 "name": f"{sh['id']} {sh['label']}"}
-        if low:  # bottom panel: static, cropped at the seam so it never spills into the top panel
-            over = seam - (pos["y"] - 540 * pos["scale"] / 100)
-            if over > 0:
-                clip["crop"] = [0, 0, round(over / (pos["scale"] / 100) / 1080 * 100, 2), 0]
-        elif d > 1.2:  # gentle push so no shot sits dead still
+        # face-lock: the frame follows the face (Premiere's Mask-to-Motion + stabilise look) — only when
+        # the face really moves inside the shot (leaning in/out, turning, handheld); "auto" decides per shot
+        lock = cfg.get("face_lock", "auto")
+        path = []
+        if lock and d > 0.4:
+            path = dense(src, sh["in"], sh["out"], anchor=face,
+                         cache=Path(rel(cfg.get("faces", "faces.json"))).with_name("faces_dense.json"))
+        mv = motion(path)
+        # only trust a path that found the face most of the time (looking down / hands over the face = no lock)
+        reliable = len(path) >= 0.6 * (d / 0.1)
+        locked = reliable and (lock is True or (lock == "auto" and mv >= cfg.get("lock_threshold", 0.25)))
+        if locked:
+            w0 = float(np.median([p["w"] for p in path]))
+            keys = []
+            for p in path:
+                # scale-lock too: hold the face's size when she leans in/out (bounded, never below the fill)
+                k_ = pos["scale"] * (min(1.25, max(0.85, w0 / p["w"])) if cfg.get("lock_scale", False) else 1)
+                k_ = max(k_, b0 if not low else k_)
+                fp = frame_face((p["cx"], p["cy"], p["w"]), k_, target, box)
+                keys.append({"t": round(p["t"] - sh["in"], 3), **fp})
+            keys[0]["t"] = 0
+            clip.update(keys[0])
+            clip["keys"] = keys
+            clip["name"] += f" [face-lock {mv:.2f}]"
+            locks.append((sh["id"], round(mv, 2)))
+        if low:  # bottom panel: the b-roll above covers the top panel, so no crop is needed for the face;
+            pass  # (a crop would also fight face-lock keyframes)
+        elif not locked and d > 1.2:  # gentle push so no shot sits dead still
             z = frame_face(face, pos["scale"] * 1.04, target, box)
             clip["keys"] = [{"t": 0, **pos}, {"t": round(d, 3), **z}]
         v_face.append(clip)
@@ -544,6 +570,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
               for c in cuts]
     report += [f"   shot {sh['id']} {sh['start']:6.2f}–{sh['start'] + sh['out'] - sh['in']:6.2f}  {sh['label']}"
                for sh in shots]
+    report.append("face-lock: " + (", ".join(f"{a} ({m})" for a, m in locks) or "none needed"))
     report.append(f"total {end:.2f}s, {len(cuts)} cuts, {len(v_face)} shots, {len(brolls)} b-roll")
     return spec, props, report
 

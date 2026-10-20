@@ -112,6 +112,22 @@ continuous), crossfades audio on alternating tracks, and writes `caps_props.json
 - Position keyframes must go through XML `keys` (MCP `add_keyframe` takes numbers only). Crop keyframes don't render
   on export — reposition instead.
 
+## 5a. Face-lock (camera locked to a face)
+
+The frame follows the speaker's face so it stays fixed in the frame while the body/background moves — the
+"camera locked to someone's face" reel look (in Premiere by hand: Object Mask on the face → Mask to Motion →
+Convert to Motion → Stabilize). Ours: `mce.faces.dense()` tracks the face every 0.1 s (stricter detector, anchored
+to the speaker, occluded/odd-size boxes dropped, smoothed) → position keyframes per shot.
+- **When it's needed:** the face moves inside a shot — leaning in/out or sideways, turning, walking, handheld
+  phone footage, a close punch-in where the face drifts toward the edge, a reaction where they jump back. Also as a
+  deliberate style beat (hold the face dead-centre while the world moves).
+- **When not:** a still speaker (static framing reads calmer; locking adds micro-wobble), the face is mostly
+  covered (hands, looking down — the tracker can't see it), or the shot wants the movement (they walk out of frame).
+- talkshort: `"face_lock": "auto"` (default) locks only shots whose face moves ≥ `lock_threshold` (0.25 face
+  widths) and was found in ≥60% of samples; prints `face-lock: 07b (0.38)`. `true` forces it, `false` disables.
+  `lock_scale` (default off) also holds the face size — only for real in/out moves; occlusion fakes size changes.
+- Multi-source specs: build the same keys by hand from `dense()` (`frame_face` per sample).
+
 ## 5b. Pro tips we follow (learned from editors' tutorials)
 
 - **Jump cuts inside one take** (a chunk was cut out of a continuous talking clip): never leave the visible jump —

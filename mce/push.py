@@ -65,14 +65,26 @@ def push(spec_path: str, export: str | None = None) -> None:
 
         if spec.get("project"):
             # several projects can be open (other sessions); never import into whichever happens to be active
-            info = json.loads(c.call("get_project_info", {}))
-            info = info.get("data", info)
+            def project_info() -> dict:
+                try:
+                    d = json.loads(c.call("get_project_info", {}))
+                    return d.get("data", d)
+                except json.JSONDecodeError:  # no project open
+                    return {}
+            info = project_info()
             if Path(info.get("path", "")).resolve() != Path(spec["project"]).resolve():
                 call("open_project", {"path": spec["project"]}, f"open {Path(spec['project']).name}")
-                info = json.loads(c.call("get_project_info", {}))
-                info = info.get("data", info)
+                info = project_info()
                 if Path(info.get("path", "")).resolve() != Path(spec["project"]).resolve():
                     raise SystemExit(f"active project is {info.get('path')}, not {spec['project']} — stopping")
+        try:  # an older sequence with the same name would be the one activated and exported
+            seqs = json.loads(c.call("list_sequences", {}))
+            seqs = seqs.get("data", seqs) if isinstance(seqs, dict) else seqs
+            if any(q.get("name") == spec["name"] for q in seqs) and spec.get("replaces") != spec["name"]:
+                raise SystemExit(f"a sequence named '{spec['name']}' already exists — give this build a new "
+                                 f"name (and \"replaces\": the old one)")
+        except json.JSONDecodeError:
+            pass
         call("import_fcp_xml", {"path": str(xml), "mode": "into_open_project"}, "import")
         call("set_active_sequence", {"sequence_id": spec["name"]}, f"activate {spec['name']}")
         seq = json.loads(c.call("get_active_sequence", {"track_type": "video", "clip_limit": 200}))
