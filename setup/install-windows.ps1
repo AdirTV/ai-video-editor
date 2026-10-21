@@ -40,6 +40,7 @@ $kinds = @("whoosh","pop","beep","click","shutter","typing","riser","impact","di
 foreach ($k in $kinds) { New-Item -ItemType Directory -Force (Join-Path $Er "SFX\$k") | Out-Null }
 if (-not (Test-Path style.md)) { if ($Language -eq "en") { Copy-Item style.template.en.md style.md } else { Copy-Item style.template.md style.md } }
 if (-not (Test-Path vocab.txt)) { New-Item vocab.txt | Out-Null }
+if (-not (Test-Path brand.json)) { Copy-Item brand.example.json brand.json }
 
 Step "6/8 Skills"
 if ($NoMinecraft) { uv run python setup\install_skills.py --skip minecraft-edit } else { uv run python setup\install_skills.py }

@@ -58,6 +58,16 @@ for s in ("video-edit", "sfx") + (("minecraft-edit",) if _cfgd.get("minecraft", 
 check("Remotion skills", any(skills.glob("remotion-*")),
       "npx -y skills add remotion-dev/skills -g -a claude-code -y", required=False)
 
+check("brand (brand.json: channel name, colours, logo)", (REPO / "brand.json").exists(),
+      "cp brand.example.json brand.json, then set your channel name and colours", required=False)
+try:
+    behind = subprocess.run(["git", "rev-list", "--count", "HEAD..origin/main"], cwd=REPO, capture_output=True,
+                            text=True).stdout.strip()
+    check("up to date (as of the last check)", behind in ("", "0"), f"{behind} update(s) waiting: uv run python setup/update.py",
+          required=False)
+except OSError:
+    pass
+
 claude_json = HOME / ".claude.json"
 registered = False
 if claude_json.exists():

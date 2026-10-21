@@ -175,6 +175,11 @@ def _lag(src: str, stream: int, processed: str, t: float = 60, d: float = 30) ->
     """Seconds by which `processed` lags the source voice (envelope cross-correlation)."""
     import numpy as np
 
+    total = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", src],
+                                 capture_output=True, text=True).stdout.strip() or 0)
+    if total and total < t + d:  # short file (an excerpt): measure over what there is
+        t, d = 0.0, total
+
     def env(f: str, st: int) -> np.ndarray:
         raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(t), "-t", str(d), "-i", f, "-map", f"0:a:{st}",
                               "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], capture_output=True).stdout

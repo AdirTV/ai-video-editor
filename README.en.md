@@ -14,7 +14,7 @@ transitions, captions, graphics, music and sound effects, and render a check.
 | | |
 |---|---|
 | **Premiere bridge** | [premiere-pro-mcp](https://github.com/leancoderkavy/premiere-pro-mcp) (open source, MIT) + a redesigned panel inside Premiere |
-| **Editing tools** (`mce/`) | transcription in English/Hebrew/any language (auto-detected), recording analysis (laughs, screams, strongest moments), forced alignment of scripts, sequence builders, J/L cuts, automatic sound effects, music (smart starts/endings, drops on cue, crossfades between songs), loudness, quality checks, voice/music/game separation (Demucs), speaker labels, shot detection (PySceneDetect), subject cutouts for text-behind-subject (SAM 2) |
+| **Editing tools** (`mce/`) | transcription in English/Hebrew/any language (auto-detected), recording analysis (laughs, screams, strongest moments), forced alignment of scripts, sequence builders, J/L cuts, automatic sound effects, music (smart starts/endings, drops on cue, crossfades between songs), loudness, quality checks, voice/music/game separation (Demucs), speaker labels, shot detection (PySceneDetect), subject cutouts for text-behind-subject (SAM 2), retake detection with best-take picks (Hebrew and English), voice diagnosis and clean-up matched to the problem, B-roll search and download |
 | **Graphics** (`remotion/`) | animated captions, CTAs, pop-up graphics, Lottie animations and animated emoji — built in Remotion and layered into Premiere with transparency; text direction follows the language |
 | **Skills** (`skills/`) | what teaches Claude how to edit: `video-edit` (general), `minecraft-edit` (Minecraft layer), `sfx` (sound effects) |
 
@@ -78,6 +78,12 @@ your editing folder with `whoosh pop riser impact ding click magic glitch minecr
 `style.md` is created at install from `style.template.en.md` (or the Hebrew template). Claude records every
 correction you make there, so it learns your taste from video to video. It's personal and never pushed to the repo.
 
+## Your brand
+`brand.json` (created at install from `brand.example.json`) holds your channel name, colours (`accent` for CTAs,
+big text and highlights; `accent2` for stickers), caption style and logo (a file in `remotion/public/brand/`).
+Every graphic falls back to it when no colour is asked for — or just tell Claude "my channel colours are…".
+It's personal and never pushed. All graphics, with stills and props: [remotion/CATALOG.md](remotion/CATALOG.md).
+
 ## Health check
 ```bash
 uv run python setup/doctor.py
@@ -85,9 +91,13 @@ uv run python setup/doctor.py
 Shows ✅/❌ for every part and how to fix it.
 
 ## Updating
+Double-click **`update-mac.command`** (Mac) or **`update-windows.bat`** (Windows), or:
 ```bash
-cd ~/ai-video-editor && git pull && uv run python setup/install_skills.py
+cd ~/ai-video-editor && uv run python setup/update.py
 ```
+It pulls the new version and re-applies only what changed (packages, the Premiere bridge and panel, the skills).
+Your personal files (`style.md`, `vocab.txt`, `brand.json`, `remotion/src/projects/`) are never touched. A ZIP
+install turns into a git checkout on its first update. Claude also checks for updates when you start an edit.
 
 ## Licenses
 - premiere-pro-mcp — MIT, by leancoderkavy (installed from npm, not included here)

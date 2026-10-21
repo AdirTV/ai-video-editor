@@ -21,6 +21,7 @@ LANGUAGE = (os.environ.get("MCE_LANGUAGE") or _cfg.get("language") or "auto").lo
 PROFILE = (os.environ.get("MCE_PROFILE") or _cfg.get("profile") or "general").lower()
 HF_TOKEN = os.environ.get("HF_TOKEN") or _cfg.get("hf_token")  # None → huggingface-cli login cache
 SFX_LIB = Path(os.environ.get("MCE_SFX_LIB") or _cfg.get("sfx_lib") or EDITING_ROOT / "SFX").expanduser()
+MINECRAFT = bool(_cfg.get("minecraft", True))  # installer: --no-minecraft → False
 
 
 def premiere_server() -> list[str]:

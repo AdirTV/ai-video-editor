@@ -1,81 +1,97 @@
 import { Composition } from "remotion";
-import { CTA } from "./CTA";
-import { BigText } from "./sift/BigText";
-import { Captions } from "./sift/Captions";
-import { Morph } from "./sift/Morph";
-import { siftCaps } from "./sift/caps";
-import { Alarm } from "./ice/Alarm";
-import { Frost } from "./ice/Frost";
-import { LightMeter } from "./ice/LightMeter";
-import { Sticker } from "./ice/Sticker";
+import { z } from "zod";
+import { Captions } from "./captions/Captions";
 import { LottieFx } from "./fx/LottieFx";
-import { YouDied } from "./ice/YouDied";
-import { YouTubeCard } from "./ice/YouTubeCard";
-import { Advancement } from "./japan/Advancement";
-import { RouteMap } from "./japan/RouteMap";
-import { SpeedrunTimer } from "./japan/SpeedrunTimer";
-import { FlightMap } from "./japan/FlightMap";
-import { ItemTooltip } from "./japan/ItemTooltip";
+import { Frost } from "./fx/Frost";
+import { LightMeter } from "./fx/LightMeter";
+import { Morph } from "./fx/Morph";
+import { FlightMap } from "./maps/FlightMap";
+import { RouteMap } from "./maps/RouteMap";
+import { Advancement } from "./minecraft/Advancement";
+import { ItemTooltip } from "./minecraft/ItemTooltip";
+import { SpeedrunTimer } from "./minecraft/SpeedrunTimer";
+import { YouDied } from "./minecraft/YouDied";
+import { CTA } from "./promo/CTA";
+import { YouTubeCard } from "./promo/YouTubeCard";
+import { Alarm } from "./text/Alarm";
+import { BigText } from "./text/BigText";
+import { Sticker } from "./text/Sticker";
+import { ProjectCompositions } from "./loadProjects";
+import { schemas, type Cap } from "./schemas";
 
-// duration from a "seconds" prop
-const bySeconds = ({ props }: { props: { seconds?: number } }) => ({ durationInFrames: Math.ceil((props.seconds ?? 1) * 60) });
+// The shared graphics. Defaults are only for previewing in Studio; real renders pass --props.
+// Your own per-video compositions go in src/projects/<name>/ (not committed), see src/projects/README.md.
 
 const FPS = 60;
+
+// duration from a "seconds" prop
+const bySeconds = ({ props }: { props: { seconds?: number } }) => ({ durationInFrames: Math.ceil((props.seconds ?? 1) * FPS) });
+
+// Studio validates props against the schema, CLI renders don't: check here so bad --props fail with the field name.
+const checked = <P,>(id: string, schema: z.ZodType, then?: (a: { props: P }) => { durationInFrames: number }) =>
+  ({ props }: { props: P }) => {
+    const r = schema.safeParse(props);
+    if (!r.success) {
+      const issues = r.error.issues.map((i) => `${i.path.join(".") || "(props)"}: ${i.message}`).join("; ");
+      throw new Error(`Bad props for ${id}: ${issues} (see remotion/CATALOG.md)`);
+    }
+    return then ? then({ props }) : {};
+  };
+
+const sampleCaps: Cap[] = [
+  { start: 0, end: 0.6, text: "ככה נראות" },
+  { start: 0.6, end: 1.3, text: "הכתוביות", hl: { הכתוביות: "#FFD84D" } },
+  { start: 1.3, end: 2, text: "with any language" },
+];
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
-      <Composition id="CTA" component={CTA} durationInFrames={108} fps={FPS} width={1080} height={1920}
-        defaultProps={{ label: "לסרטון המלא", accent: "#FFD84D" }} />
-      <Composition id="SiftCaptions" component={Captions} durationInFrames={913} fps={FPS} width={1080} height={1920}
-        defaultProps={{ caps: siftCaps }} />
-      <Composition id="Captions" component={Captions} fps={FPS} width={1080} height={1920}
-        durationInFrames={60} defaultProps={{ caps: siftCaps, top: 980, size: 118, seconds: 1 }}
-        calculateMetadata={({ props }) => ({ durationInFrames: Math.ceil((props.seconds ?? 1) * FPS) })} />
-      <Composition id="Pop2027" component={BigText} durationInFrames={78} fps={FPS} width={1080} height={1920}
-        defaultProps={{ text: "2027", color: "#FFD84D" }} />
-      <Composition id="BlubToRabbit" component={Morph} durationInFrames={60} fps={FPS} width={1080} height={1920}
-        defaultProps={{ from: "blub.png", to: "rabbit.png", swapAt: 23 }} />
-      <Composition id="Frost" component={Frost} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ grow: 1.2, tint: 0.22, seconds: 2 }} calculateMetadata={bySeconds} />
-      <Composition id="YouDied" component={YouDied} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ seconds: 1.6 }} calculateMetadata={bySeconds} />
-      <Composition id="LightMeter" component={LightMeter} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ label: "רמת אור", warn: "חזק מדי!", fill: 0.9, seconds: 1.6 }} calculateMetadata={bySeconds} />
-      <Composition id="Alarm" component={Alarm} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ text: "זהירות!", seconds: 1.2 }} calculateMetadata={bySeconds} />
-      <Composition id="Sticker" component={Sticker} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ text: "חדש!", bg: "#6FC8FF", seconds: 1.2 }} calculateMetadata={bySeconds} />
-      <Composition id="LottieFx" component={LottieFx} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ emoji: "😂", size: 420, seconds: 2 }} calculateMetadata={bySeconds} />
-      <Composition id="YouTubeCard" component={YouTubeCard} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ seconds: 4.58, thumb: "ice/thumb.png", title: "כל הדברים החדשים במיינקראפט לייב 2026!",
-          channel: "אדיר טיוי", meta: "הועלה עכשיו", tapAt: 2.43 }} calculateMetadata={bySeconds} />
-      <Composition id="Advancement" component={Advancement} fps={FPS} width={1920} height={1080} durationInFrames={60}
-        defaultProps={{ seconds: 3, text: "הגעת לחנות מיינקראפט ביפן", icon: "Emerald.png", frame: "challenge" as const, scale: 1 }}
-        calculateMetadata={bySeconds} />
-      <Composition id="AdvancementV" component={Advancement} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ seconds: 3, text: "נסעת במונורייל", icon: "Minecart.png", frame: "task" as const, scale: 0.8, top: 260, side: "center" as const }}
-        calculateMetadata={bySeconds} />
-      <Composition id="RouteMap" component={RouteMap} fps={FPS} width={1920} height={1080} durationInFrames={60}
-        defaultProps={{ seconds: 5, size: 900, stops: [
-          { x: 0.15, y: 0.2, label: "המלון" }, { x: 0.35, y: 0.45, label: "מטרו", icon: "Minecart.png" },
-          { x: 0.62, y: 0.55, label: "מונורייל", icon: "Minecart.png" }, { x: 0.82, y: 0.82, label: "חנות מיינקראפט" } ] }}
-        calculateMetadata={bySeconds} />
-      <Composition id="SpeedrunTimer" component={SpeedrunTimer} fps={FPS} width={1920} height={1080} durationInFrames={60}
-        defaultProps={{ seconds: 6, from: 0, to: 3083, scale: 0.9, splits: [
-          { label: "יציאה מהמלון", at: 0 }, { label: "לוסון", at: 134 }, { label: "מטרו", at: 422 },
-          { label: "מונורייל", at: 1125 }, { label: "אודאיבה", at: 2563 }, { label: "דייברסיטי", at: 2903 },
-          { label: "חנות מיינקראפט", at: 3083 } ] }}
-        calculateMetadata={bySeconds} />
-      <Composition id="FlightMap" component={FlightMap} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ seconds: 2.6 }} calculateMetadata={bySeconds} />
-      <Composition id="ItemTooltip" component={ItemTooltip} fps={FPS} width={1080} height={1920} durationInFrames={60}
+      <Composition id="Captions" component={Captions} schema={schemas.Captions} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ caps: sampleCaps, top: 980, size: 118, seconds: 2 }} calculateMetadata={checked("Captions", schemas.Captions, bySeconds)} />
+      <Composition id="CTA" component={CTA} schema={schemas.CTA} durationInFrames={108} fps={FPS} width={1080} height={1920}
+        defaultProps={{ label: "לסרטון המלא" }} calculateMetadata={checked("CTA", schemas.CTA)} />
+      <Composition id="BigText" component={BigText} schema={schemas.BigText} durationInFrames={78} fps={FPS} width={1080} height={1920}
+        defaultProps={{ text: "2027" }} calculateMetadata={checked("BigText", schemas.BigText)} />
+      <Composition id="Sticker" component={Sticker} schema={schemas.Sticker} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ text: "חדש!", seconds: 1.2 }} calculateMetadata={checked("Sticker", schemas.Sticker, bySeconds)} />
+      <Composition id="Alarm" component={Alarm} schema={schemas.Alarm} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ text: "זהירות!", seconds: 1.2 }} calculateMetadata={checked("Alarm", schemas.Alarm, bySeconds)} />
+      <Composition id="Morph" component={Morph} schema={schemas.Morph} durationInFrames={60} fps={FPS} width={1080} height={1920}
+        defaultProps={{ from: "mc/Creeper.webp", to: "mc/Axolotl.webp", swapAt: 23 }} calculateMetadata={checked("Morph", schemas.Morph)} />
+      <Composition id="Frost" component={Frost} schema={schemas.Frost} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ grow: 1.2, tint: 0.22, seconds: 2 }} calculateMetadata={checked("Frost", schemas.Frost, bySeconds)} />
+      <Composition id="LightMeter" component={LightMeter} schema={schemas.LightMeter} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ label: "רמת אור", warn: "חזק מדי!", fill: 0.9, seconds: 1.6 }} calculateMetadata={checked("LightMeter", schemas.LightMeter, bySeconds)} />
+      <Composition id="LottieFx" component={LottieFx} schema={schemas.LottieFx} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ emoji: "😂", size: 420, seconds: 2 }} calculateMetadata={checked("LottieFx", schemas.LottieFx, bySeconds)} />
+      <Composition id="YouTubeCard" component={YouTubeCard} schema={schemas.YouTubeCard} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ seconds: 4.58, thumb: "core/thumb.png", title: "הסרטון המלא כבר בערוץ!", meta: "הועלה עכשיו", tapAt: 2.43 }} calculateMetadata={checked("YouTubeCard", schemas.YouTubeCard, bySeconds)} />
+      <Composition id="YouDied" component={YouDied} schema={schemas.YouDied} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ seconds: 1.6 }} calculateMetadata={checked("YouDied", schemas.YouDied, bySeconds)} />
+      <Composition id="Advancement" component={Advancement} schema={schemas.Advancement} fps={FPS} width={1920} height={1080} durationInFrames={60}
+        defaultProps={{ seconds: 3, text: "מצאת יהלומים", icon: "Diamond.png", frame: "challenge" as const, scale: 1 }}
+        calculateMetadata={checked("Advancement", schemas.Advancement, bySeconds)} />
+      <Composition id="AdvancementV" component={Advancement} schema={schemas.Advancement} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ seconds: 3, text: "נסעת בעגלה", icon: "Minecart.png", frame: "task" as const, scale: 0.8, top: 260, side: "center" as const }}
+        calculateMetadata={checked("AdvancementV", schemas.Advancement, bySeconds)} />
+      <Composition id="ItemTooltip" component={ItemTooltip} schema={schemas.ItemTooltip} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ seconds: 3, lines: [
-          { text: "לגו אנדר דרגון" },
-          { text: "", count: 15980, prefix: "¥", color: "#FFAA00", at: 0.3 },
-          { text: "≈ 309 ₪", color: "#55FF55", at: 1.1 } ] }}
-        calculateMetadata={bySeconds} />
+          { text: "חרב יהלום" },
+          { text: "", count: 120, prefix: "₪", color: "#FFAA00", at: 0.3 } ] }}
+        calculateMetadata={checked("ItemTooltip", schemas.ItemTooltip, bySeconds)} />
+      <Composition id="SpeedrunTimer" component={SpeedrunTimer} schema={schemas.SpeedrunTimer} fps={FPS} width={1920} height={1080} durationInFrames={60}
+        defaultProps={{ seconds: 6, from: 0, to: 600, scale: 0.9, splits: [
+          { label: "התחלה", at: 0 }, { label: "ברזל", at: 140 }, { label: "נת'ר", at: 380 }, { label: "סוף", at: 600 } ] }}
+        calculateMetadata={checked("SpeedrunTimer", schemas.SpeedrunTimer, bySeconds)} />
+      <Composition id="RouteMap" component={RouteMap} schema={schemas.RouteMap} fps={FPS} width={1920} height={1080} durationInFrames={60}
+        defaultProps={{ seconds: 5, size: 900, stops: [
+          { x: 0.15, y: 0.2, label: "בית" }, { x: 0.4, y: 0.5, label: "תחנה", icon: "Minecart.png" },
+          { x: 0.82, y: 0.82, label: "יעד" } ] }}
+        calculateMetadata={checked("RouteMap", schemas.RouteMap, bySeconds)} />
+      <Composition id="FlightMap" component={FlightMap} schema={schemas.FlightMap} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ seconds: 2.6 }} calculateMetadata={checked("FlightMap", schemas.FlightMap, bySeconds)} />
+      <ProjectCompositions />
     </>
   );
 };

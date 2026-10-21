@@ -72,6 +72,7 @@ if [ ! -f style.md ]; then
   if [ "$LANG_OPT" = "en" ]; then cp style.template.en.md style.md; else cp style.template.md style.md; fi
 fi
 [ -f vocab.txt ] || : > vocab.txt
+[ -f brand.json ] || cp brand.example.json brand.json
 
 step "7/8 Skills"
 if [ "$MC" = 1 ]; then uv run python setup/install_skills.py; else uv run python setup/install_skills.py --skip minecraft-edit; fi

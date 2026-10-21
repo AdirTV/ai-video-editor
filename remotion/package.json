@@ -1,19 +1,23 @@
 {
   "name": "remotion",
   "version": "1.0.0",
-  "description": "My Remotion video",
+  "description": "Shared graphics for the AI video editor",
   "repository": {},
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@remotion/bundler": "4.0.535",
     "@remotion/cli": "4.0.535",
     "@remotion/google-fonts": "4.0.535",
     "@remotion/lottie": "4.0.535",
+    "@remotion/renderer": "4.0.535",
+    "@remotion/zod-types": "4.0.535",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.535",
     "topojson-client": "^3.1.0",
-    "world-atlas": "^2.0.2"
+    "world-atlas": "^2.0.2",
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.535",
@@ -27,6 +31,7 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
+    "lint": "eslint src && tsc",
+    "catalog": "node scripts/catalog.mts"
   }
 }

@@ -18,6 +18,12 @@ e.g. `minecraft-edit` (HUD health/menus/death, milestones, "Minecraft but…"). 
 format with its own skill, load that skill too.
 
 Read `{{MCE_HOME}}/style.md` first, every time — its learned-preferences section overrides everything.
+`brand.json` (same folder) is the creator's channel name, colours, caption font/look and logo: the graphics fall back to
+it, so don't pass colours that just repeat it. When the user states brand colours or a logo, write them there.
+
+**Updates:** once per session, before the first edit, run `cd {{MCE_HOME}} && uv run python setup/update.py --check`.
+If updates are waiting, tell the user in a line what's new and offer to run `uv run python setup/update.py`
+(then they restart Claude Code). Skip silently if it can't reach GitHub.
 
 ## 1. Analyze footage
 
@@ -72,9 +78,14 @@ version, saves, renders, runs QA. Spec extras: clip `"effects": [{"name", "props
 
 ## 3b. Talking-head → vertical short (`mce.talkshort`)
 
-For a person talking to camera (often many retakes of the same lines): you pick the best take of each line
-from `transcript.md` (the last clean, complete take is usually the keeper; skip takes where the speaker looks
-down/reads — check frames), list them as `takes` in a config, and `uv run python -m mce.talkshort <config.json>`
+For a person talking to camera (often many retakes of the same lines): first run
+`uv run python -m mce.retakes analysis/transcript.json` (Hebrew, English, any language; multi-clip transcripts
+too). It groups the attempts at each line, marks the best (complete, fluent, confident; later takes preferred),
+cuts false starts ("so this is part one so this is part one of…") and off-script talk between takes ("okay",
+"no", "רגע", "עוד פעם"), and writes `analysis/retakes.json` with `takes` = the ranges to keep. That's a
+proposal: read the groups, check the picks against the frames (skip takes where the speaker looks down/reads or
+the delivery is flat), drop leftover chatter it can't know about ("let's just do the other one"), and decide the
+"repeated word?" list (stutter → cut, emphasis like "ממש ממש" → keep). Then list the final `takes` in a config, and `uv run python -m mce.talkshort <config.json>`
 does the handwork: cuts pauses (word gaps **and** measured silences — ASR stretches words over pauses) and
 fillers, pre-masters the voice to a WAV (mic stream of multi-stream recordings), frames the face (`mce.faces`,
 cached) and changes punch-in level at every cut and every ~1.8 s inside long sentences (picture only, audio
@@ -83,8 +94,8 @@ continuous), crossfades audio on alternating tracks, and writes `caps_props.json
   font `carlito`). Shots without B-roll fall back to full-frame face. B-roll `"at"` takes a shot id from the printed
   shot list (`"06a"`, `"06a+0.9"`); clips fill their shot and slow down (≥0.7×) if short; `zoom` hides letterboxing
   (find bars with `cropdetect`), panels are cropped at the seam.
-- Pick B-roll by what is said (money → cash shots, "robbing a store" → robbery…). Find shot boundaries with
-  `mce.scenes` (section 5c) so in/out never crosses a cut. Official trailers via `yt-dlp` (H.264) → CFR 60.
+- Pick B-roll by what is said (money → cash shots, "robbing a store" → robbery…) and fetch it yourself with
+  `mce.broll` (section 5d). Find shot boundaries with `mce.scenes` (section 5c) so in/out never crosses a cut.
 - Talking-head shorts (see style.md): split 40/60 (`split_ratio`), top = a *literal* picture of what is said;
   captions **white, one line, same size** (`look: "stream"`): **on the seam while the screen is split, lower third
   (`top` ≈1460) otherwise** — never moving mid-phrase. the user rejected 2-line karaoke. Keep headroom tight (`full_target_y` ≈620, `low_face_y` ≈0.30).
@@ -102,7 +113,7 @@ continuous), crossfades audio on alternating tracks, and writes `caps_props.json
 2. Time captions/cuts by **forced alignment of the script** (`mce.align.align_script(wav, [(in, out, text)], lang)`),
    not ASR timestamps — ASR mishears words and once shifted a section by 0.7 s. Spell numbers out the way they're
    spoken ("twenty twenty seven" / "אלפיים עשרים ושבע"); unplaceable words are interpolated.
-3. B-roll: `yt-dlp` (prefer H.264; convert VFR/30 fps to CFR before use; verify in/out against real frames).
+3. B-roll: `mce.broll` (section 5d) — search, scan, get the exact section as H.264 CFR, verify on the sheet.
 4. Show what's said: when the VO names a thing, show it (image/PNG pop, the real thumbnail on a YouTube card, etc.).
 
 ## 5. Finishing toolbox
@@ -111,10 +122,18 @@ continuous), crossfades audio on alternating tracks, and writes `caps_props.json
   "Fold Motion", "Glitch", "Flash", "Whip", "Zoom Blur"… `add_transition_to_clip` (edge, ~0.25 s) pops overlays
   in/out; `add_transition` (track + cut second) for cuts. Avoid Pull Motion between two full-frame fills (shows a flat
   panel edge). "Gaussian Blur" via apply_effect may resolve to Impact Blur (param "Amount").
-- **Captions / graphics**: Remotion (`remotion/`): `Captions` (word groups, pop in/out, keyword colours, one line,
-  auto-shrink, direction from text), `CTA`, `BigText`, `Morph` (A turns into B), `Sticker`, `Alarm`, `YouTubeCard`,
-  `Advancement`, `RouteMap`… Render with alpha:
+- **Captions / graphics**: Remotion (`remotion/`). **`remotion/CATALOG.md` lists every shared composition with a
+  still, its props (types, required, notes) and a ready render command — read it before picking or rendering one.**
+  The props are zod schemas in `remotion/src/schemas.ts`; bad `--props` fail fast with the field name.
+  `Captions` (word groups, pop in/out, keyword colours, one line, auto-shrink, direction from text), `CTA`, `BigText`,
+  `Morph` (A turns into B), `Sticker`, `Alarm`, `YouTubeCard`, `Advancement`, `RouteMap`… Render with alpha:
   `npx remotion render <Comp> out.mov --props='<json>' --image-format=png --pixel-format=yuva444p10le --codec=prores --prores-profile=4444`.
+  Layout: shared components by role in `src/{captions,text,promo,fx,maps,minecraft}/`, registered in `src/Root.tsx`;
+  shared assets in `public/mc/` (Minecraft icons/fonts) and `public/core/`. A graphic made for ONE video goes in
+  `src/projects/<name>/index.tsx` (exports `Compositions`, auto-loaded) with media in `public/projects/<name>/` —
+  both gitignored. Only move something into the shared folders when another creator would genuinely use it; then
+  add its schema + catalog entry in `src/schemas.ts`, register it in `Root.tsx` with neutral defaults, and run
+  `npm run catalog` (in `remotion/`) to refresh CATALOG.md and the gallery.
   Give re-renders NEW filenames (Premiere caches by path). Premiere SRT captions: avoid (small, RTL number bugs).
 - **J/L cuts** (see section 7). **Music** and **SFX** (sections 8 and the `sfx` skill).
 - Position keyframes must go through XML `keys` (MCP `add_keyframe` takes numbers only). Crop keyframes don't render
@@ -170,6 +189,8 @@ All `cd {{MCE_HOME}} && uv run python -m mce.<tool> …`; each prints its usage 
   footage (never cross a cut), splitting a montage or VOD into shots, finding someone else's jump cuts.
   `adaptive` (default) ignores steady camera motion — right for games and handheld; `content` catches more (fast
   whip-pans too); `fade` finds fades to black. Shots shorter than `--min-len` (0.5 s) merge into neighbours.
+  Fast handheld / cinematic trailer camera can fool `adaptive` into a "shot" every ~0.5 s (seen on a GTA 6 trailer
+  clip: 11 shots in 8 s, really 2) — if the list is mostly sub-second shots, rerun with `--detector content`.
 - **Subject cutout — `mce.matte <video> --start S --end E [--point x,y] [--neg x,y] [--box x0,y0,x1,y1]`**
   (SAM 2 video, ~3 frames/s on Apple Silicon → keep it to the seconds you need): ProRes 4444 with alpha of the
   subject alone, at the source size/fps, starting at `--start`. No prompt = the main person (biggest, most central);
@@ -190,6 +211,46 @@ All `cd {{MCE_HOME}} && uv run python -m mce.<tool> …`; each prints its usage 
   library). Props: `size`, `x`/`y` (centre px), `loop`, `speed`, `pop` (pop in/out, default on), `rotate`.
   Use for reactions next to a face, arrows/circles pointing at something, subscribe/like animations, icons
   (money, alarm, check/cross) — small and short (1–2 s), timed to the word, with a matching SFX.
+
+## 5d. B-roll — find it yourself
+
+When the words name something the viewer should *see* (a block, a mob, a place, a product, money, a game
+mechanic), find the shot — don't leave a marker for the user unless nothing usable exists. One literal picture
+per idea, a few seconds each, matching what is said at that moment.
+1. Own footage first: the project's `footage/`, earlier projects in the editing folder (search file names and
+   transcripts), the official clips already downloaded there.
+2. `uv run python -m mce.broll search "<thing> <game/brand>"` — prefer the official channel (Minecraft, Rockstar,
+   the brand), then clear tutorials/showcases; search in English even for Hebrew videos (more footage).
+3. `uv run python -m mce.broll scan <id>` → a frame sheet across the whole video (low-res, fast): look at it and find
+   where the thing is actually on screen. Not there → next result.
+4. `uv run python -m mce.broll get <id> --from M:SS --to M:SS --name <what> --dir <project>/footage/broll` → H.264 CFR
+   60 (or `--fps` of the edit), plus a sheet of the clip: confirm it shows the right thing, with no facecam, UI
+   overlays or watermarks you don't want; `mce.scenes` for exact cuts inside it. Strip the source's music with
+   `mce.stems` if it would clash (or Content-ID).
+5. Client / sponsored work (e.g. a brand video): only footage the user has rights to — their own, the client's,
+   or free-licence stock (Pexels, Pixabay — download from the site). Ask if unsure.
+
+## 5e. Voice clean-up — only when it's needed, at the lightest level that works
+
+Every voice already goes through the normal master (high-pass, light denoise, EQ, de-ess, compression, loudness).
+Extra clean-up is for real problems — the user asks for it, or the audio is noisy (room hum, street, kitchen,
+crowd, music under the speech). Over-cleaning sounds watery/robotic and is worse than a little room tone.
+1. `uv run python -m mce.voice analyze <media> [--stream N] [--transcript …]` → voice vs background level (SNR),
+   steady (fan/hiss/AC) vs changing (people/street/music/game) background, mains hum (50/60 Hz), clipping,
+   bandwidth, and a suggested level. "clean recording" → do nothing extra.
+2. Unsure, or it matters (a client video, a long VO)? `mce.voice compare <media>` → the same 20 s at
+   original/light/medium/strong, same loudness, in `<media>_voice_compare/`. Let the user listen and choose.
+3. `mce.voice clean <media> --level light|medium|strong [--hum 50] [--declip]` → a mastered, lip-synced WAV for
+   the dialogue track (mute the camera audio under it, don't delete it).
+   - light = steady hiss/fan under a decent recording · medium = noisy room, pulls the room down in the pauses ·
+     strong = Demucs separates the voice from a changing background (music, game, street, crowd) — slow.
+   - With strong, the background stem is kept: when the sound around the voice is part of the story (the store,
+     the cooking, the game, the crowd's reaction), lay it on its own track 12-18 dB under the voice instead of
+     losing it. Silence around a voice in a busy place sounds fake.
+   - Can't fix: heavy echo/reverb, very narrow (phone) bandwidth, heavy clipping. For echo, tell the user about
+     Premiere's Essential Sound → Dialogue → **Enhance Speech** (Premiere 2024+, one click per clip, very good) or
+     Adobe Podcast Enhance — those are clicks for the user. A re-record beats any repair.
+4. Talkshort configs already master the voice; to use a cleaned file instead, point the edit at the WAV from step 3.
 
 ## 6. Review loop (every time, before the user sees anything)
 
@@ -244,4 +305,4 @@ section, so the next edit already follows it.
 
 Repo: github.com/AdirTV/ai-video-editor (local clone = {{MCE_HOME}}). After changing tools or skills:
 `python3 setup/export_skills.py` (skills → `skills/` with paths as placeholders), check `git status` holds no
-media/personal files, commit, push. Never hardcode paths in code — use `mce/config.py`.
+media/personal files (per-video Remotion work stays in `remotion/src/projects/`), commit, push. Never hardcode paths in code — use `mce/config.py`.

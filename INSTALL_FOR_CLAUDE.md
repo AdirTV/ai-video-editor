@@ -11,7 +11,8 @@ dump command output on them.
   on Mac, `%USERPROFILE%\Desktop\editing` on Windows), and **which language their videos are in** —
   Hebrew (`he`), English (`en`) or mixed/other (`auto`, detected per video). Also ask whether they make
   **Minecraft** videos — if not, add `--no-minecraft` (Mac) / `-NoMinecraft` (Windows) so only the general
-  editor is installed. Everything else has defaults.
+  editor is installed. Optionally ask for their **channel name** (and brand colours / logo if they have
+  them) for step 3b. Everything else has defaults.
 - Detect the OS (`uname` / `$env:OS`).
 
 ## 1. Get the code
@@ -43,6 +44,11 @@ and Remotion dependencies, the skills (`video-edit`, `sfx`, Remotion's, and `min
 `cd <repo> && uv run python setup/doctor.py` — every required line must be ✅. For each ❌ it prints the
 fix; apply it and run doctor again. The "Premiere is open" line is expected to be ⚠️ until step 4.
 
+## 3b. Brand (optional)
+The installer creates `brand.json` in the repo (from `brand.example.json`). Put the user's channel name in
+`channel`; if they gave colours, set `accent` (CTA, big text, highlights) and `accent2` (stickers). A logo goes
+in `remotion/public/brand/` with `"logo": "brand/<file>"`. The graphics use these whenever a prop isn't passed.
+
 ## 4. Hand-off to the user (they must do these themselves)
 1. **Restart Claude Code** (new skills and the new MCP server load only in a new session).
 2. **Restart Premiere Pro**, then **Window → Extensions → MCP for Adobe Premiere Pro** → make sure it
@@ -56,4 +62,7 @@ Then tell them how to use it, in their language, e.g. open Claude Code in a proj
 It works for any kind of video (gaming, vlogs, talking head, podcasts, shorts) in Hebrew or English.
 
 ## Updating later
-`cd <repo> && git pull && uv run python setup/install_skills.py` (re-run the installer if dependencies changed).
+`cd <repo> && uv run python setup/update.py` — pulls the latest version and re-applies only what changed
+(Python/Remotion packages, the Premiere bridge and panel, the skills). Users can also double-click
+`update-mac.command` / `update-windows.bat`. A ZIP install becomes a git checkout on its first update.
+Personal files (`style.md`, `vocab.txt`, `brand.json`, `remotion/src/projects/`) are never touched.

@@ -19,5 +19,5 @@ for (let r = 0; r < rows; r++) { let row = "";
       n += isLand(LON0 + (c + (a + 0.5) / 4) * STEP, LAT0 - (r + (b + 0.5) / 4) * STEP) ? 1 : 0;
     row += n >= 5 ? "#" : "."; }
   grid.push(row); }
-fs.writeFileSync("src/japan/landgrid.json", JSON.stringify({ LON0, LAT0, STEP, grid }));
+fs.writeFileSync("src/maps/landgrid.json", JSON.stringify({ LON0, LAT0, STEP, grid }));
 console.log(grid.join("\n"));

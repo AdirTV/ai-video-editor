@@ -2,6 +2,7 @@ import { Lottie, LottieAnimationData } from "@remotion/lottie";
 import { useEffect, useState } from "react";
 import { AbsoluteFill, cancelRender, continueRender, delayRender, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { popOpacity, popScale } from "../pop";
+import type { Props } from "../schemas";
 
 // Noto animated emoji (Google, CC BY 4.0): "😂" -> .../1f602/lottie.json
 const notoUrl = (emoji: string) =>
@@ -17,10 +18,7 @@ const resolve = (src?: string, emoji?: string) => {
 };
 
 // A ready-made Lottie animation (LottieFiles JSON or an animated emoji) placed on the frame, popping in/out.
-export const LottieFx: React.FC<{
-  seconds?: number; src?: string; emoji?: string; size?: number; x?: number; y?: number;
-  loop?: boolean; speed?: number; pop?: boolean; rotate?: number;
-}> = ({ src, emoji, size = 360, x, y, loop = true, speed = 1, pop = true, rotate = 0 }) => {
+export const LottieFx: React.FC<Props<"LottieFx">> = ({ src, emoji, size = 360, x, y, loop = true, speed = 1, pop = true, rotate = 0 }) => {
   const frame = useCurrentFrame();
   const { width, height, durationInFrames } = useVideoConfig();
   const [handle] = useState(() => delayRender("Loading Lottie"));

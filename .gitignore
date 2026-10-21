@@ -5,9 +5,16 @@ node_modules/
 # personal: each person keeps their own
 style.md
 vocab.txt
+brand.json
 # media and outputs never go in the repo
 remotion/public/*
 !remotion/public/.gitkeep
+# shared assets the components need (Minecraft icons/fonts, placeholders)
+!remotion/public/mc/
+!remotion/public/core/
+# your own per-video graphics and their media stay local
+remotion/src/projects/*
+!remotion/src/projects/README.md
 remotion/out/
 *.mp4
 *.mov

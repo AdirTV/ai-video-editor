@@ -38,7 +38,9 @@ def probe(path: str) -> MediaInfo:
             "sample_rate": int(s.get("sample_rate", 48000)),
             "title": s.get("tags", {}).get("title", ""),
         }
+        # iPhone spatial audio (apple_apac) is a 2nd stream ffmpeg can't decode — not a separate source
         for i, s in enumerate(x for x in data["streams"] if x["codec_type"] == "audio")
+        if s.get("codec_name") != "apple_apac"
     ]
     return MediaInfo(
         path=path,
