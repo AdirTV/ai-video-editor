@@ -61,15 +61,32 @@ def _asr_mlx(wav_path: str, lang: str, prompt: str) -> tuple[list[dict], str]:
 
         import whisperx
         lang = _vote(whisperx.load_audio(wav_path), one)
-    # No VAD here: hallucination_silence_threshold skips made-up text in long silences instead.
+    # No word_timestamps / hallucination_silence_threshold: together they re-decode around every pause and
+    # made a 4-min Hebrew file take 8-35 min instead of 30 s. Word times come from the WhisperX aligner anyway,
+    # and text invented in silence is dropped below by checking the audio is actually voiced there.
     result = mlx_whisper.transcribe(
         wav_path, path_or_hf_repo=MLX_MODELS.get(lang, MLX_DEFAULT_MODEL), language=lang,
         initial_prompt=prompt or None, condition_on_previous_text=False,
-        word_timestamps=True, hallucination_silence_threshold=2.0,
     )
     segs = [{"start": s["start"], "end": s["end"], "text": s["text"]}
             for s in result["segments"] if s["text"].strip()]
-    return segs, lang
+    return _drop_silent(segs, wav_path), lang
+
+
+def _drop_silent(segs: list[dict], wav_path: str, min_voiced: float = 0.15) -> list[dict]:
+    """Drop segments (≥1 s) where under `min_voiced` of the time has any voice — Whisper's made-up text
+    in silence/music-only stretches. Generous on purpose: quiet speech still clears it."""
+    import whisperx
+
+    from . import audio
+
+    db = audio.envelope(whisperx.load_audio(wav_path))  # any format → 16 kHz mono float
+    speech = audio.speech_segments(db, max_gap=0.5, min_len=0.1)
+
+    def voiced(a, b):
+        return sum(max(0.0, min(b, e) - max(a, s)) for s, e in speech)
+    return [g for g in segs
+            if g["end"] - g["start"] < 1.0 or voiced(g["start"], g["end"]) >= min_voiced * (g["end"] - g["start"])]
 
 
 def _vote(audio, detect_one, n: int = 12, sec: int = 30) -> str:
