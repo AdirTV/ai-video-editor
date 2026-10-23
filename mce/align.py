@@ -17,6 +17,7 @@ import json
 import sys
 
 from .i18n import guess
+from .transcribe import _device
 
 
 def align_script(wav_path: str, clips: list[tuple[float, float, str]], lang: str | None = None) -> list[dict]:
@@ -24,10 +25,10 @@ def align_script(wav_path: str, clips: list[tuple[float, float, str]], lang: str
 
     audio = whisperx.load_audio(wav_path)
     lang = lang or guess(" ".join(c[2] for c in clips))
-    model, meta = whisperx.load_align_model(language_code=lang, device="cpu")
+    model, meta = whisperx.load_align_model(language_code=lang, device=_device())
     out = []
     for a, b, text in clips:
-        res = whisperx.align([{"start": a, "end": b, "text": text}], model, meta, audio, "cpu",
+        res = whisperx.align([{"start": a, "end": b, "text": text}], model, meta, audio, _device(),
                              return_char_alignments=False)
         words = [w for seg in res["segments"] for w in seg.get("words", [])]  # aligner splits sentences
         # Fill in words without timestamps by interpolating between placed neighbours.

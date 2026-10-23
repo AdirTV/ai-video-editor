@@ -6,15 +6,18 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@react-three/fiber": "9.1.2",
     "@remotion/bundler": "4.0.535",
     "@remotion/cli": "4.0.535",
     "@remotion/google-fonts": "4.0.535",
     "@remotion/lottie": "4.0.535",
     "@remotion/renderer": "4.0.535",
+    "@remotion/three": "4.0.535",
     "@remotion/zod-types": "4.0.535",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.535",
+    "three": "0.170.0",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2",
     "zod": "4.5.4"
@@ -22,6 +25,7 @@
   "devDependencies": {
     "@remotion/eslint-config-flat": "4.0.535",
     "@types/react": "19.2.7",
+    "@types/three": "0.170.0",
     "@types/web": "0.0.166",
     "eslint": "9.39.5",
     "prettier": "3.8.1",

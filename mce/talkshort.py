@@ -321,11 +321,26 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     cuts, t = [], 0.0
     gap = cfg.get("max_gap", 0.3)
     sil = silences(src, cfg.get("stream", 1) - 1, cfg.get("silence_db", -38), gap)
+    # ASR often ends a word before its last syllable has faded: move every cut into the measured pause
+    # around it (out = where the pause starts, in = where it ends), so no word is clipped
+    pauses = silences(src, cfg.get("stream", 1) - 1, cfg.get("silence_db", -38), 0.1)
     for take in cfg["takes"]:
         for p in split_on_silence(pieces((take[0], take[1]), words, gap, fillers), sil):
             if p.get("hard_in"):
                 p["in"] = quietest(src, cfg.get("stream", 1) - 1, *p.pop("hard_in"))
                 p["hard_in"] = True
+            elif cfg.get("snap_to_pauses", True):
+                w0, w1 = p["words"][0]["start"], p["words"][-1]["end"]
+                pre = [b for a, b in pauses if b <= w0 + 0.02 and b >= w0 - 0.35]
+                if pre:
+                    p["in"] = round(max(pre) - 0.04, 3)
+                post = [a for a, b in pauses if a >= w1 - 0.02 and a <= w1 + 0.4]
+                p["out"] = round(min(post) + 0.06, 3) if post else round(max(p["out"], w1 + 0.2), 3)
+            # J-cut ("jcut": seconds): the next sentence's sound starts under the previous picture, so the
+            # edit runs on without a breath; its picture follows at the old cut point (see shots below)
+            jd = cfg.get("jcut", 0) if cuts else 0
+            t -= jd
+            p["j"] = jd
             p["start"] = round(t, 3)
             p["label"] = take[2] if len(take) > 2 else ""
             t += p["out"] - p["in"]
@@ -336,13 +351,17 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     shot_len = cfg.get("shot_len", 1.8)  # framing changes about this often, even mid-sentence
     shots = []
     for i, c in enumerate(cuts):
-        bounds, last, ws = [c["in"]], c["in"], c["words"]
+        # J-cut picture: the new shot appears "jcut_picture" s after its sound starts; the previous shot
+        # holds those frames (the speaker listening/finishing), so V1 has no gap
+        jl = cfg.get("jcut_picture", 0)
+        b0 = c["in"] + c.get("j", 0) + (jl if i else 0)
+        bounds, last, ws = [b0], b0, c["words"]
         for k, w in enumerate(ws[1:], 1):
             after_punct = ws[k - 1]["word"][-1:] in ",.!?"
             if w["start"] - last >= (shot_len * 0.7 if after_punct else shot_len) and c["out"] - w["start"] >= 0.8:
                 bounds.append(w["start"] - 0.04)
                 last = bounds[-1]
-        bounds.append(c["out"])
+        bounds.append(c["out"] + (jl if i + 1 < len(cuts) else 0))
         for sub, (s0, s1) in enumerate(zip(bounds, bounds[1:])):
             shots.append({"id": f"{i + 1:02d}{'abcdefghijklmnop'[sub]}", "cut": i, "in": round(s0, 3),
                           "out": round(s1, 3), "start": round(c["start"] + s0 - c["in"], 3),
@@ -418,7 +437,8 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         low = split and covered(sh["start"], sh["start"] + d)
         face = face_at(faces, c["in"], c["out"])
         box, target, b0 = (low_box, low_target, low_base) if low else (full_box, full_target, full_base)
-        pos = frame_face(face, b0 * punch[lvl] / 100, target, box)
+        pl = punch if low else cfg.get("full_punch", punch)  # full-frame shots can punch in less (or not at all)
+        pos = frame_face(face, b0 * pl[lvl % len(pl)] / 100, target, box)
         clip = {"file": "src", "start": sh["start"], "in": sh["in"], "out": sh["out"], **pos,
                 "name": f"{sh['id']} {sh['label']}"}
         # face-lock: the frame follows the face (Premiere's Mask-to-Motion + stabilise look) — only when

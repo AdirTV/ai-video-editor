@@ -15,9 +15,14 @@ Extra spec fields (see timeline_xml for the rest):
   top   "limit_db": -2     -> Hard Limiter (max amplitude) on every audio clip
   top   "vo_lufs": -14     -> gain the voiceover clips (file key "vo_file", default "vo") to this loudness
 
-  uv run python -m mce.push <spec.json> [--export out.mp4]
+Before rebuilding, changes made by hand in Premiere to the old sequence ("replaces", else
+the same name) are pulled into the spec (mce/pull.py); after importing, the new sequence is
+snapshotted so the next pull can tell hand edits apart. Clips get stable "id"s.
+
+  uv run python -m mce.push <spec.json> [--export out.mp4] [--no-pull] [--force]
 """
 import argparse
+import copy
 import json
 from pathlib import Path
 
@@ -34,28 +39,83 @@ def _ok(res: str) -> bool:
     return bool(d.get("verified") or d.get("outcome") == "verified" or d.get("imported") or d.get("deleted"))
 
 
-def push(spec_path: str, export: str | None = None) -> None:
-    spec = json.loads(Path(spec_path).read_text())
+GROUP_STEPS = ("vo", "music", "sfx")
+
+
+def prepare(spec: dict, quiet: bool = False) -> tuple[dict, dict[str, str]]:
+    """push's own steps on the spec (voice loudness, music, ducking, SFX). Returns the
+    spec and {clip id: "vo" | "music" | "sfx"} for every clip a step created or changed,
+    so pull can tell those apart from the spec's own clips."""
+    say = (lambda *a: None) if quiet else print
+    groups: dict[str, str] = {}
+    n = 0
+
+    def step(group, fn, files=()):
+        nonlocal n
+        before = {c["id"]: json.dumps(c, sort_keys=True) for k in ("video", "audio")
+                  for tr in spec.get(k, []) for c in tr if c.get("id")}
+        out = fn()
+        for k in ("video", "audio"):
+            for tr in spec.get(k, []):
+                for c in tr:
+                    if not c.get("id"):
+                        n += 1
+                        c["id"] = f"auto-{group}-{n}"
+                        groups[c["id"]] = group
+                    elif before.get(c["id"]) != json.dumps(c, sort_keys=True) or c.get("file") in files:
+                        groups.setdefault(c["id"], group)
+        return out
+
     if spec.get("vo_lufs"):
         from .loudness import normalize_vo
-        print("Loudness:", normalize_vo(spec, spec.get("vo_file", "vo"), spec["vo_lufs"]))
+        say("Loudness:", step("vo", lambda: normalize_vo(spec, spec.get("vo_file", "vo"), spec["vo_lufs"]),
+                                     {spec.get("vo_file", "vo")}))
     if spec.get("music_playlist"):
         from .music import apply_playlist
         pl = spec["music_playlist"]
-        print("Music:\n  " + "\n  ".join(apply_playlist(spec, pl["songs"], pl.get("xfade"), pl.get("db", -20),
-                                                           pl.get("end", "fade"))))
+        say("Music:\n  " + "\n  ".join(step("music", lambda: apply_playlist(
+            spec, pl["songs"], pl.get("xfade"), pl.get("db", -20), pl.get("end", "fade")),
+            {song["file"] for song in pl["songs"]})))
     elif spec.get("music_fit"):
         from .music import apply_fit
-        print("Music:", apply_fit(spec, **({} if spec["music_fit"] is True else spec["music_fit"])))
+        say("Music:", step("music", lambda: apply_fit(spec, **({} if spec["music_fit"] is True else spec["music_fit"])),
+                                  {(spec["music_fit"] if isinstance(spec["music_fit"], dict) else {}).get("music_file", "music")}))
     if spec.get("duck_music"):
         from .loudness import duck_music
-        print("Ducking:", duck_music(spec, **({} if spec["duck_music"] is True else spec["duck_music"])))
+        say("Ducking:", step("music", lambda: duck_music(spec, **({} if spec["duck_music"] is True else spec["duck_music"])),
+                                    {(spec["duck_music"] if isinstance(spec["duck_music"], dict) else {}).get("music_file", "music")}))
     if spec.get("auto_sfx"):
         from .sfx import plan
-        spec, report = plan(spec)
-        print("\n".join(["SFX:"] + report))
-    xml = Path(spec_path).with_suffix(".xml")
-    xml.write_text(build(spec))
+
+        def sfx():
+            nonlocal spec
+            new, report = plan(spec)
+            if new is not spec:
+                spec.clear()
+                spec.update(new)
+            return report
+        say("\n".join(["SFX:"] + step("sfx", sfx)))
+    return spec, groups
+
+
+def assign_ids(spec: dict) -> bool:
+    """Stable ids on the spec's clips, so pull can find them again after Claude edits the spec."""
+    used = {c.get("id") for k in ("video", "audio") for tr in spec.get(k, []) for c in tr}
+    n, changed = 0, False
+    for k in ("video", "audio"):
+        for tr in spec.get(k, []):
+            for c in tr:
+                if not c.get("id"):
+                    n += 1
+                    while f"c{n}" in used:
+                        n += 1
+                    c["id"] = f"c{n}"
+                    used.add(c["id"])
+                    changed = True
+    return changed
+
+
+def push(spec_path: str, export: str | None = None, keep_edits: bool = True, force: bool = False) -> None:
     c = Client()
     try:
         def call(tool, args, label):
@@ -63,6 +123,7 @@ def push(spec_path: str, export: str | None = None) -> None:
             print(("✓ " if _ok(res) else "✗ ") + label + ("" if _ok(res) else f"  → {res[:200]}"))
             return res
 
+        spec = json.loads(Path(spec_path).read_text())
         if spec.get("project"):
             # several projects can be open (other sessions); never import into whichever happens to be active
             def project_info() -> dict:
@@ -77,12 +138,34 @@ def push(spec_path: str, export: str | None = None) -> None:
                 info = project_info()
                 if Path(info.get("path", "")).resolve() != Path(spec["project"]).resolve():
                     raise SystemExit(f"active project is {info.get('path')}, not {spec['project']} — stopping")
+        if keep_edits:
+            # the editor may have changed the old sequence by hand: carry that into the spec before rebuilding
+            from .pull import pull
+            r = pull(spec_path, client=c, quiet=True)
+            if r and r[1] and not force:
+                raise SystemExit("stopping: some of your Premiere changes couldn't be placed in the spec (above) — "
+                                 "fix the spec, or push with --force to drop them")
+            spec = json.loads(Path(spec_path).read_text())
+        if assign_ids(spec):
+            Path(spec_path).write_text(json.dumps(spec, ensure_ascii=False, indent=1))
+        spec, groups = prepare(spec)
+        built = copy.deepcopy(spec)  # before headroom boosts swap files: what pull compares against
+        xml = Path(spec_path).with_suffix(".xml")
+        xml.write_text(build(spec))
+        replaces = spec.get("replaces")
         try:  # an older sequence with the same name would be the one activated and exported
             seqs = json.loads(c.call("list_sequences", {}))
             seqs = seqs.get("data", seqs) if isinstance(seqs, dict) else seqs
-            if any(q.get("name") == spec["name"] for q in seqs) and spec.get("replaces") != spec["name"]:
+            exists = any(q.get("name") == spec["name"] for q in seqs)
+            if exists and replaces != spec["name"]:
                 raise SystemExit(f"a sequence named '{spec['name']}' already exists — give this build a new "
                                  f"name (and \"replaces\": the old one)")
+            if replaces == spec["name"]:
+                # same name: delete the old one *before* importing — after, a delete by name could hit the
+                # new one (and on a first build there is nothing to delete)
+                if exists:
+                    call("delete_sequence", {"sequence_id": replaces}, f"delete old {replaces}")
+                replaces = None
         except json.JSONDecodeError:
             pass
         import time
@@ -97,11 +180,15 @@ def push(spec_path: str, export: str | None = None) -> None:
         call("set_active_sequence", {"sequence_id": spec["name"]}, f"activate {spec['name']}")
         seq = json.loads(c.call("get_active_sequence", {"track_type": "video", "clip_limit": 200}))
         seq = seq.get("data", seq)
-        ids = {cl["name"]: cl["nodeId"] for t in seq["videoTracks"] for cl in t["clips"]}
+        def node(ti, clip):  # by track + start: pieces of a razored clip share a name
+            tracks = seq["videoTracks"]
+            cands = [cl for cl in (tracks[ti]["clips"] if ti < len(tracks) else []) if cl["name"] == clip.get("name")]
+            best = min(cands, key=lambda cl: abs(cl["start"] - clip["start"]), default=None)
+            return best["nodeId"] if best and abs(best["start"] - clip["start"]) < 0.05 else None
 
-        for track in spec["video"]:
+        for ti, track in enumerate(spec["video"]):
             for clip in track:
-                nid = ids.get(clip.get("name"))
+                nid = node(ti, clip)
                 if not nid:
                     continue
                 for fx in clip.get("effects", []):
@@ -135,10 +222,22 @@ def push(spec_path: str, export: str | None = None) -> None:
             call("add_transition", {"transition_name": tr["name"], "track_index": tr.get("track", 0),
                                     "cut_point_seconds": tr["t"], "duration_seconds": tr.get("dur", 0.25)},
                  f"{tr['name']} @ {tr['t']} (V{tr.get('track', 0) + 1})")
-        if spec.get("replaces"):
-            call("delete_sequence", {"sequence_id": spec["replaces"]}, f"delete {spec['replaces']}")
+        if replaces:
+            call("delete_sequence", {"sequence_id": replaces}, f"delete {replaces}")
             call("set_active_sequence", {"sequence_id": spec["name"]}, "re-activate")
         call("save_project", {}, "save project")
+        try:
+            from .pull import make_snapshot, read_live, snapshot_path
+            snap = snapshot_path(spec_path, spec["name"])
+            parsed = read_live(c, spec["name"], snap.with_suffix(".pushed.xml"))
+            snap.write_text(json.dumps(make_snapshot(built, parsed, groups, spec["name"]), ensure_ascii=False))
+            if replaces:
+                old = snapshot_path(spec_path, replaces)
+                for f in (old, old.with_suffix(".pushed.xml"), old.with_suffix(".live.xml")):
+                    f.unlink(missing_ok=True)
+            print("✓ snapshot for pull")
+        except (SystemExit, Exception) as e:  # never fail a push over this
+            print(f"✗ snapshot for pull: {e}")
         if export:
             # Deleting a sequence can make Premiere switch timelines asynchronously;
             # confirm what is active right before rendering.
@@ -161,5 +260,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("spec")
     p.add_argument("--export")
+    p.add_argument("--no-pull", action="store_true", help="don't carry hand edits from Premiere into the spec")
+    p.add_argument("--force", action="store_true", help="push even if some hand edits couldn't be placed")
     a = p.parse_args()
-    push(a.spec, a.export)
+    push(a.spec, a.export, keep_edits=not a.no_pull, force=a.force)

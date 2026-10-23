@@ -62,10 +62,15 @@ def analyze(args) -> None:
             audio.extract(src, game_i, str(game_wav))
         game = audio.game_events(audio.envelope(audio.load(str(game_wav))))
     _log(f"audio: {len(speech)} speech segments, {len(excite)} excited, {len(game)} game spikes")
-    from . import events
-    sounds = events.detect(str(mic_wav), groups=["laugh", "scream", "gasp"])
-    if game_i is not None or game_from_stems:
-        sounds += events.detect(str(out / "audio" / "game.wav"), groups=["explosion"])
+    sounds_path = out / "sounds.json"
+    if sounds_path.exists():
+        sounds = json.loads(sounds_path.read_text())
+    else:
+        from . import events
+        sounds = events.detect(str(mic_wav), groups=["laugh", "scream", "gasp"])
+        if game_i is not None or game_from_stems:
+            sounds += events.detect(str(out / "audio" / "game.wav"), groups=["explosion"])
+        _save(sounds_path, sounds)
     _log(f"sound events: " + ", ".join(f"{k} {sum(e['kind'] == k for e in sounds)}"
                                         for k in ("laugh", "scream", "gasp", "explosion")))
 

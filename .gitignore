@@ -22,3 +22,5 @@ remotion/out/
 *.mp3
 *_analysis/
 test/
+# personal branding files
+brand/

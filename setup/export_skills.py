@@ -26,7 +26,14 @@ REPLACE = [
 
 for name in SKILLS:
     src, dst = HOME / ".claude" / "skills" / name, REPO / "skills" / name
+    # files that exist only in the repo copy would be lost by the rmtree below — bring them into the live skill first
     if dst.exists():
+        for f in dst.rglob("*"):
+            live = src / f.relative_to(dst)
+            if f.is_file() and not live.exists():
+                live.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, live)
+                print(f"kept {f.relative_to(REPO)} (copied into the live skill)")
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
     for f in dst.rglob("*.md"):

@@ -6,6 +6,7 @@ import { Frost } from "./fx/Frost";
 import { LightMeter } from "./fx/LightMeter";
 import { Morph } from "./fx/Morph";
 import { FlightMap } from "./maps/FlightMap";
+import { ChatMessage } from "./stream/ChatMessage";
 import { RouteMap } from "./maps/RouteMap";
 import { Advancement } from "./minecraft/Advancement";
 import { ItemTooltip } from "./minecraft/ItemTooltip";
@@ -16,8 +17,10 @@ import { YouTubeCard } from "./promo/YouTubeCard";
 import { Alarm } from "./text/Alarm";
 import { BigText } from "./text/BigText";
 import { Sticker } from "./text/Sticker";
+import { TextPop } from "./text/TextPop";
+import { WordCards, wordCardsMetadata } from "./text/WordCards";
 import { ProjectCompositions } from "./loadProjects";
-import { schemas, type Cap } from "./schemas";
+import { schemas, type Cap, type Props } from "./schemas";
 
 // The shared graphics. Defaults are only for previewing in Studio; real renders pass --props.
 // Your own per-video compositions go in src/projects/<name>/ (not committed), see src/projects/README.md.
@@ -38,6 +41,18 @@ const checked = <P,>(id: string, schema: z.ZodType, then?: (a: { props: P }) => 
     return then ? then({ props }) : {};
   };
 
+// Without a transcript every line needs its time; with one (transcript: "projects/x/transcript.json") just the words.
+const sampleCards = [
+  { base: "כמה", script: "חברים", baseAt: 0.1, scriptAt: 0.35, scriptGlow: true, end: 1.1 },
+  { base: "עולם", keyword: "מיינקראפט", script: "אחד", icon: "mc/Diamond.png", iconSide: "right" as const, baseAt: 1.15, keywordAt: 1.5, scriptAt: 1.9, end: 2.6 },
+  { base: "ואז הבית", keyword: "התפוצץ", keyColor: "#FF5A1F", glitch: true, baseAt: 2.7, keywordAt: 3.0, end: 4.0 },
+  { base: "זה התחיל כמו", keyword: "סרבייבל", script: "רגיל", theme: "cream" as const, baseAt: 4.1, keywordAt: 4.4, scriptAt: 4.8, end: 5.6 },
+];
+const checkedCards = (id: string) => async (a: { props: Props<"WordCards"> }) => {
+  checked(id, schemas.WordCards)(a);
+  return wordCardsMetadata(FPS)(a);
+};
+
 const sampleCaps: Cap[] = [
   { start: 0, end: 0.6, text: "ככה נראות" },
   { start: 0.6, end: 1.3, text: "הכתוביות", hl: { הכתוביות: "#FFD84D" } },
@@ -55,6 +70,8 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{ text: "2027" }} calculateMetadata={checked("BigText", schemas.BigText)} />
       <Composition id="Sticker" component={Sticker} schema={schemas.Sticker} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ text: "חדש!", seconds: 1.2 }} calculateMetadata={checked("Sticker", schemas.Sticker, bySeconds)} />
+      <Composition id="TextPop" component={TextPop} schema={schemas.TextPop} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ text: "איזה מטורף!", seconds: 2 }} calculateMetadata={checked("TextPop", schemas.TextPop, bySeconds)} />
       <Composition id="Alarm" component={Alarm} schema={schemas.Alarm} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ text: "זהירות!", seconds: 1.2 }} calculateMetadata={checked("Alarm", schemas.Alarm, bySeconds)} />
       <Composition id="Morph" component={Morph} schema={schemas.Morph} durationInFrames={60} fps={FPS} width={1080} height={1920}
@@ -91,6 +108,14 @@ export const RemotionRoot: React.FC = () => {
         calculateMetadata={checked("RouteMap", schemas.RouteMap, bySeconds)} />
       <Composition id="FlightMap" component={FlightMap} schema={schemas.FlightMap} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ seconds: 2.6 }} calculateMetadata={checked("FlightMap", schemas.FlightMap, bySeconds)} />
+      <Composition id="ChatMessage" component={ChatMessage} schema={schemas.ChatMessage} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ seconds: 3, user: "viewer_01", userColor: "#DAA520",
+          parts: [{ text: "Greatest player of the year", at: 0 }, { text: "(only you play this game)", at: 1.2, big: true }] }}
+        calculateMetadata={checked("ChatMessage", schemas.ChatMessage, bySeconds)} />
+      <Composition id="WordCards" component={WordCards} schema={schemas.WordCards} fps={FPS} width={1920} height={1080} durationInFrames={60}
+        defaultProps={{ cards: sampleCards }} calculateMetadata={checkedCards("WordCards")} />
+      <Composition id="WordCardsV" component={WordCards} schema={schemas.WordCards} fps={FPS} width={1080} height={1920} durationInFrames={60}
+        defaultProps={{ cards: sampleCards }} calculateMetadata={checkedCards("WordCardsV")} />
       <ProjectCompositions />
     </>
   );

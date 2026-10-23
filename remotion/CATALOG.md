@@ -9,6 +9,7 @@ edit in Premiere. Colours and the channel name fall back to `brand.json` when no
 <a href="#cta"><img src="docs/gallery/CTA.jpg" height="160" alt="CTA"></a>
 <a href="#bigtext"><img src="docs/gallery/BigText.jpg" height="160" alt="BigText"></a>
 <a href="#sticker"><img src="docs/gallery/Sticker.jpg" height="160" alt="Sticker"></a>
+<a href="#textpop"><img src="docs/gallery/TextPop.jpg" height="160" alt="TextPop"></a>
 <a href="#alarm"><img src="docs/gallery/Alarm.jpg" height="160" alt="Alarm"></a>
 <a href="#morph"><img src="docs/gallery/Morph.jpg" height="160" alt="Morph"></a>
 <a href="#frost"><img src="docs/gallery/Frost.jpg" height="160" alt="Frost"></a>
@@ -22,6 +23,9 @@ edit in Premiere. Colours and the channel name fall back to `brand.json` when no
 <a href="#speedruntimer"><img src="docs/gallery/SpeedrunTimer.jpg" height="160" alt="SpeedrunTimer"></a>
 <a href="#routemap"><img src="docs/gallery/RouteMap.jpg" height="160" alt="RouteMap"></a>
 <a href="#flightmap"><img src="docs/gallery/FlightMap.jpg" height="160" alt="FlightMap"></a>
+<a href="#wordcards"><img src="docs/gallery/WordCards.jpg" height="160" alt="WordCards"></a>
+<a href="#wordcardsv"><img src="docs/gallery/WordCardsV.jpg" height="160" alt="WordCardsV"></a>
+<a href="#chatmessage"><img src="docs/gallery/ChatMessage.jpg" height="160" alt="ChatMessage"></a>
 
 ## Captions
 <img src="docs/gallery/Captions.jpg" align="right" width="180">
@@ -98,6 +102,31 @@ Tilted label with a hard shadow ("חדש!", a place name).
 Example:
 ```bash
 npx remotion render Sticker out.mov --props='{"text":"חדש!","seconds":1.2}' --image-format=png --pixel-format=yuva444p10le --codec=prores --prores-profile=4444
+```
+<br clear="right">
+
+## TextPop
+<img src="docs/gallery/TextPop.jpg" align="right" width="180">
+
+A line whose letters pop in one by one with a springy overshoot, a glow and a light sweep.  
+`1080×1920` · 60 fps · component `TextPop`
+
+| prop | type | required | notes |
+|---|---|---|---|
+| `seconds` | number |  | Length of the clip in seconds |
+| `text` | string | ✔ | One line; long text shrinks to fit |
+| `color` | string |  | Text colour. Default #fff |
+| `glow` | string |  | Glow colour. Default: brand accent |
+| `size` | number |  | px. Default 150 |
+| `top` | number |  | px. Default 820 |
+| `by` | "char" \| "word" |  | Pop letter by letter or word by word. Default char |
+| `stagger` | number |  | Frames between letters/words. Default 2 |
+| `bounces` | number |  | Overshoot bounces. Default 2 |
+| `sweep` | boolean |  | Light sweep after it lands. Default true |
+
+Example:
+```bash
+npx remotion render TextPop out.mov --props='{"text":"איזה מטורף!","seconds":2}' --image-format=png --pixel-format=yuva444p10le --codec=prores --prores-profile=4444
 ```
 <br clear="right">
 
@@ -367,5 +396,71 @@ Pixel world map with a flight arc and a km counter.
 Example:
 ```bash
 npx remotion render FlightMap out.mov --props='{"seconds":2.6}' --image-format=png --pixel-format=yuva444p10le --codec=prores --prores-profile=4444
+```
+<br clear="right">
+
+## WordCards
+<img src="docs/gallery/WordCards.jpg" align="right" width="320">
+
+Documentary kinetic-type opener: base line + huge keyword + handwritten line per card, blur-in, echo, glitch, grain; cards cut on the voice from transcript.json.  
+`1920×1080` · 60 fps · component `WordCards`
+
+| prop | type | required | notes |
+|---|---|---|---|
+| `cards` | { base, keyword, script, theme, keyColor, glow, scriptColor, scriptGlow, echo, glitch, layout, icon, iconSide, iconSize, zoom, start, end, baseAt, keywordAt, scriptAt }[] | ✔ | Cards in order. Each line is found in the transcript after the previous card's words, so repeated words land right |
+| `transcript` | string |  | transcript.json from mce analyze, copied under public/ (e.g. projects/x/transcript.json) |
+| `offset` | number |  | Transcript second that is 0 of this clip. Default 0 |
+| `audio` | string |  | Voiceover under public/ to play under the cards (starts at offset) |
+| `grain` | boolean |  | Film grain over everything. Default true |
+| `seconds` | number |  | Length of the clip in seconds |
+| `resolved` | { start, end, at }[] |  | Filled in by calculateMetadata; leave empty |
+
+Example:
+```bash
+npx remotion render WordCards out.mov --props='{"cards":[{"base":"כמה","script":"חברים","baseAt":0.1,"scriptAt":0.35,"scriptGlow":true,"end":1.1},{"base":"עולם","keyword":"מיינקראפט","script":"אחד","icon":"mc/Diamond.png","iconSide":"right","baseAt":1.15,"keywordAt":1.5,"scriptAt":1.9,"end":2.6},{"base":"ואז הבית","keyword":"התפוצץ","keyColor":"#FF5A1F","glitch":true,"baseAt":2.7,"keywordAt":3,"end":4},{"base":"זה התחיל כמו","keyword":"סרבייבל","script":"רגיל","theme":"cream","baseAt":4.1,"keywordAt":4.4,"scriptAt":4.8,"end":5.6}]}' --image-format=png --pixel-format=yuva444p10le --codec=prores --prores-profile=4444
+```
+<br clear="right">
+
+## WordCardsV
+<img src="docs/gallery/WordCardsV.jpg" align="right" width="180">
+
+Same cards, laid out for vertical video.  
+`1080×1920` · 60 fps · component `WordCards`
+
+| prop | type | required | notes |
+|---|---|---|---|
+| `cards` | { base, keyword, script, theme, keyColor, glow, scriptColor, scriptGlow, echo, glitch, layout, icon, iconSide, iconSize, zoom, start, end, baseAt, keywordAt, scriptAt }[] | ✔ | Cards in order. Each line is found in the transcript after the previous card's words, so repeated words land right |
+| `transcript` | string |  | transcript.json from mce analyze, copied under public/ (e.g. projects/x/transcript.json) |
+| `offset` | number |  | Transcript second that is 0 of this clip. Default 0 |
+| `audio` | string |  | Voiceover under public/ to play under the cards (starts at offset) |
+| `grain` | boolean |  | Film grain over everything. Default true |
+| `seconds` | number |  | Length of the clip in seconds |
+| `resolved` | { start, end, at }[] |  | Filled in by calculateMetadata; leave empty |
+
+Example:
+```bash
+npx remotion render WordCardsV out.mov --props='{"cards":[{"base":"כמה","script":"חברים","baseAt":0.1,"scriptAt":0.35,"scriptGlow":true,"end":1.1},{"base":"עולם","keyword":"מיינקראפט","script":"אחד","icon":"mc/Diamond.png","iconSide":"right","baseAt":1.15,"keywordAt":1.5,"scriptAt":1.9,"end":2.6},{"base":"ואז הבית","keyword":"התפוצץ","keyColor":"#FF5A1F","glitch":true,"baseAt":2.7,"keywordAt":3,"end":4},{"base":"זה התחיל כמו","keyword":"סרבייבל","script":"רגיל","theme":"cream","baseAt":4.1,"keywordAt":4.4,"scriptAt":4.8,"end":5.6}]}' --image-format=png --pixel-format=yuva444p10le --codec=prores --prores-profile=4444
+```
+<br clear="right">
+
+## ChatMessage
+<img src="docs/gallery/ChatMessage.jpg" align="right" width="180">
+
+A live-chat message the streamer reacts to; parts arrive one by one, a big part slams in.  
+`1080×1920` · 60 fps · component `ChatMessage`
+
+| prop | type | required | notes |
+|---|---|---|---|
+| `seconds` | number |  | Length of the clip in seconds |
+| `user` | string | ✔ | Chatter's name |
+| `userColor` | string |  | Name colour (their real Twitch colour if known). Default #BF94FF |
+| `parts` | { text, at, big, color }[] | ✔ | The message, in pieces that can arrive one after another |
+| `top` | number |  | px. Default 900 |
+| `size` | number |  | px. Default 58 |
+| `accent` | string |  | Left bar colour. Default Twitch purple |
+
+Example:
+```bash
+npx remotion render ChatMessage out.mov --props='{"seconds":3,"user":"viewer_01","userColor":"#DAA520","parts":[{"text":"Greatest player of the year","at":0},{"text":"(only you play this game)","at":1.2,"big":true}]}' --image-format=png --pixel-format=yuva444p10le --codec=prores --prores-profile=4444
 ```
 <br clear="right">
