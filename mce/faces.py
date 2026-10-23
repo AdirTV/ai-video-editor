@@ -12,12 +12,45 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+# YuNet (OpenCV Zoo, MIT): a small CNN face detector — finds faces looking down/sideways and half-covered by a
+# hand, which the old Haar cascade missed (WIDER FACE hard AP ~71 vs ~30), and it's faster (~8 vs ~12 ms/frame).
+YUNET = Path(__file__).parent / "models" / "face_detection_yunet_2023mar.onnx"
+DETECTOR = "yunet-2023mar"  # stored with cached tracks: a different detector invalidates them
+# YuNet's box hugs the face; Haar's (which every framing knob — face size targets, punch-in levels, face-lock —
+# was tuned on) is ~1.24x wider, same centre (measured on 23 frames). Boxes are scaled to that size.
+HAAR_SIZE = 1.24
+_yunet = None
+
+
+def detect(img: np.ndarray, min_score: float = 0.7, width: int = 960) -> list[tuple[float, float, float, float, float]]:
+    """Faces in a BGR frame → [(x, y, w, h, score)] in the frame's own pixels, best first."""
+    global _yunet
+    k = width / img.shape[1]
+    small = cv2.resize(img, None, fx=k, fy=k) if k != 1 else img
+    h, w = small.shape[:2]
+    if _yunet is None:
+        _yunet = cv2.FaceDetectorYN.create(str(YUNET), "", (w, h), 0.5, 0.3, 50)
+    _yunet.setInputSize((w, h))
+    _yunet.setScoreThreshold(min_score)
+    _, faces = _yunet.detect(small)
+    if faces is None:
+        return []
+    out = []
+    for f in faces:
+        if f[2] < 20:
+            continue
+        cx, cy = (f[0] + f[2] / 2) / k, (f[1] + f[3] / 2) / k
+        w, h = f[2] / k * HAAR_SIZE, f[3] / k * HAAR_SIZE
+        out.append((cx - w / 2, cy - h / 2, w, h, float(f[-1])))
+    return sorted(out, key=lambda b: -b[4])
+
 
 def track(src: str, every: float = 0.5, out: Path | None = None) -> list[dict]:
     out = out or Path(src).with_name(Path(src).stem + "_faces.json")
     if out.exists():
-        return json.loads(out.read_text())
-    cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        cached = json.loads(out.read_text())
+        if isinstance(cached, dict) and cached.get("detector") == DETECTOR:
+            return cached["rows"]  # (a plain list = an older detector's track: redo it)
     cap = cv2.VideoCapture(src)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
     n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -28,20 +61,17 @@ def track(src: str, every: float = 0.5, out: Path | None = None) -> list[dict]:
         ok, img = cap.read()
         if not ok:
             break
-        k = 960 / img.shape[1]
-        g = cv2.cvtColor(cv2.resize(img, None, fx=k, fy=k), cv2.COLOR_BGR2GRAY)
-        hits = cascade.detectMultiScale(g, 1.1, 5, minSize=(40, 40))
-        if len(hits):
+        hits = detect(img)
+        if hits:
             # the face nearest the last one (or the biggest) — ignores posters/background faces
             def score(h):
-                x, y, w, hh = h
-                c = np.array([x + w / 2, y + hh / 2]) / k
-                return -np.linalg.norm(c - prev) if prev is not None else w
-            x, y, w, hh = max(hits, key=score)
-            prev = np.array([x + w / 2, y + hh / 2]) / k
+                c = np.array([h[0] + h[2] / 2, h[1] + h[3] / 2])
+                return -np.linalg.norm(c - prev) if prev is not None else h[2]
+            x, y, w, hh, _ = max(hits, key=score)
+            prev = np.array([x + w / 2, y + hh / 2])
             rows.append({"t": round(f / fps, 2), "cx": round(float(prev[0])), "cy": round(float(prev[1])),
-                         "w": round(w / k)})
-    out.write_text(json.dumps(rows))
+                         "w": round(w)})
+    out.write_text(json.dumps({"detector": DETECTOR, "rows": rows}))
     return rows
 
 
@@ -59,11 +89,10 @@ def dense(src: str, t0: float, t1: float, every: float = 0.1, cache: Path | None
     """Face centre/width every `every` s over [t0, t1], outliers dropped and smoothed (for face-lock).
     anchor = the speaker's face around then (face_at): detections farther than ~1.5 face widths from it are
     background faces/posters, never the speaker. Cached per range in `cache` (a json dict)."""
-    key = f"v2-{t0:.3f}-{t1:.3f}-{every}" + (f"-a{anchor[0]:.0f},{anchor[1]:.0f}" if anchor else "")
+    key = f"{DETECTOR}-{t0:.3f}-{t1:.3f}-{every}" + (f"-a{anchor[0]:.0f},{anchor[1]:.0f}" if anchor else "")
     store = json.loads(cache.read_text()) if cache and cache.exists() else {}
     if key in store:
         return store[key]
-    cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     cap = cv2.VideoCapture(src)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
     raw, prev = [], None
@@ -77,21 +106,17 @@ def dense(src: str, t0: float, t1: float, every: float = 0.1, cache: Path | None
         if not ok:
             break
         if (f - f0) % step == 0:
-            k = 960 / img.shape[1]
-            g = cv2.cvtColor(cv2.resize(img, None, fx=k, fy=k), cv2.COLOR_BGR2GRAY)
-            hits = cascade.detectMultiScale(g, 1.1, 8, minSize=(40, 40))  # stricter: occluded faces drop out
+            hits = detect(img, min_score=0.8)  # stricter: badly occluded faces drop out
             if anchor is not None:
-                hits = [h for h in hits if np.hypot((h[0] + h[2] / 2) / k - anchor[0],
-                                                    (h[1] + h[3] / 2) / k - anchor[1]) < 1.5 * anchor[2]
-                        and 0.5 < (h[2] / k) / anchor[2] < 2.0]
-            if len(hits):
+                hits = [h for h in hits if np.hypot(h[0] + h[2] / 2 - anchor[0], h[1] + h[3] / 2 - anchor[1])
+                        < 1.5 * anchor[2] and 0.5 < h[2] / anchor[2] < 2.0]
+            if hits:
                 def score(h):
-                    x, y, w, hh = h
-                    c = np.array([x + w / 2, y + hh / 2]) / k
-                    return -np.linalg.norm(c - prev) if prev is not None else w
-                x, y, w, hh = max(hits, key=score)
-                prev = np.array([x + w / 2, y + hh / 2]) / k
-                raw.append((f / fps, float(prev[0]), float(prev[1]), w / k))
+                    c = np.array([h[0] + h[2] / 2, h[1] + h[3] / 2])
+                    return -np.linalg.norm(c - prev) if prev is not None else h[2]
+                x, y, w, hh, _ = max(hits, key=score)
+                prev = np.array([x + w / 2, y + hh / 2])
+                raw.append((f / fps, float(prev[0]), float(prev[1]), w))
         f += 1
     out = []
     if raw:

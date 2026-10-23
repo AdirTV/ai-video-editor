@@ -30,7 +30,8 @@ def _crop(img: np.ndarray, frac: tuple[float, float, float, float]) -> np.ndarra
 
 def detect_layout(src: str, width: int, height: int, duration: float) -> str:
     """For a side-by-side recording, find which half holds the facecam."""
-    cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    from .faces import detect
+
     hits = {"left": 0, "right": 0}
     for t in np.linspace(duration * 0.1, duration * 0.9, 8):
         frame = grab_frame(src, float(t), width, height)
@@ -38,8 +39,7 @@ def detect_layout(src: str, width: int, height: int, duration: float) -> str:
             continue
         half = frame.shape[1] // 2
         for side, img in (("left", frame[:, :half]), ("right", frame[:, half:])):
-            gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-            hits[side] += len(cascade.detectMultiScale(gray, 1.2, 5, minSize=(60, 60)))
+            hits[side] += len(detect(cv2.cvtColor(img, cv2.COLOR_RGB2BGR)))
     return "facecam_left" if hits["left"] >= hits["right"] else "facecam_right"
 
 
