@@ -34,7 +34,7 @@ Open Claude Code (desktop app → Code tab, or `claude` in a terminal), paste
 git clone https://github.com/AdirTV/ai-video-editor.git ~/ai-video-editor
 bash ~/ai-video-editor/setup/install-mac.sh --language en
 ```
-It asks for your Mac password (to install Homebrew) and where your editing projects live.
+It asks where your editing projects live, and — only if Homebrew isn't installed yet — your Mac password to install it. Safe to re-run: existing settings are kept.
 
 ### By hand — Windows
 Download the ZIP from the green **Code** button, extract it somewhere permanent (e.g. `Documents\ai-video-editor`)
@@ -71,7 +71,7 @@ large-v3-turbo. Captions and graphics lay out left-to-right or right-to-left fro
 
 ## Sound effects
 The library isn't in the repo (it's huge and everyone has their own). The installer creates an `SFX` folder in
-your editing folder with `whoosh pop riser impact ding click magic glitch minecraft` subfolders. Drop sounds in
+your editing folder with `whoosh pop beep click shutter typing riser impact ding magic glitch minecraft` subfolders (`minecraft` only with the Minecraft layer). Drop sounds in
 (or a whole pack into `SFX/`) and tell Claude "index the SFX library".
 
 ## Your style
@@ -108,5 +108,6 @@ install turns into a git checkout on its first update. Claude also checks for up
 
 ## Troubleshooting
 - **"heartbeat is stale"** — the MCP panel in Premiere is closed or stuck: Window → Extensions → MCP for Adobe Premiere Pro.
-- **After a premiere-pro-mcp update the panel looks old again** — `bash panel/install.sh` (Mac) or re-run the installer.
-- **Windows** — the tools were developed on Mac; they should work on Windows, but if something breaks, send the error message.
+- **After a premiere-pro-mcp update the panel looks old again** — `bash panel/install.sh` (Mac) or re-run `install-windows.bat` (Windows).
+- **Windows** — the tools were developed on Mac and handle Windows paths, Hebrew text and settings files, but get less testing there. If something breaks, open a GitHub issue with the error; `uv run python setup/doctor.py` shows what's missing.
+- **The installer stopped halfway** — fix what the message says and run it again. It's safe: finished parts aren't broken and settings are kept.

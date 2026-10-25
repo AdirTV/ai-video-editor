@@ -11,7 +11,11 @@ dump command output on them.
   on Mac, `%USERPROFILE%\Desktop\editing` on Windows), and **which language their videos are in** —
   Hebrew (`he`), English (`en`) or mixed/other (`auto`, detected per video). Also ask whether they make
   **Minecraft** videos — if not, add `--no-minecraft` (Mac) / `-NoMinecraft` (Windows) so only the general
-  editor is installed. Optionally ask for their **channel name** (and brand colours / logo if they have
+  editor is installed. If **Adobe Media Encoder** is installed (Mac: `ls -d "/Applications/Adobe Media Encoder"*`,
+  Windows: `Test-Path "$env:ProgramFiles\Adobe\Adobe Media Encoder*"`), ask whether exports should render
+  there — Premiere stays free during a render and an export crash can't take it (and unsaved work) down;
+  recommended — and pass `--export-via ame` or `--export-via premiere` (Windows: `-ExportVia ame|premiere`).
+  Without it the default is `auto` (Media Encoder when installed). Optionally ask for their **channel name** (and brand colours / logo if they have
   them) for step 3b. Everything else has defaults.
 - Detect the OS (`uname` / `$env:OS`).
 
@@ -21,10 +25,8 @@ Clone to a permanent place (not Downloads):
 - Windows: `git clone https://github.com/AdirTV/ai-video-editor.git "$HOME\ai-video-editor"`
   (if `git` is missing: `winget install --id Git.Git -e`, then open a new shell)
 
-If cloning fails with an authentication error, the repo is private: the user must accept the GitHub
-invitation from Adir (check their email / github.com/notifications) and sign in once with
-`gh auth login` (install `gh` with `brew install gh` / `winget install GitHub.cli`), or download the ZIP
-from the repo page and extract it to the same place.
+The repo is public, so no GitHub account is needed. If git can't be installed, download the ZIP from the repo
+page and extract it to the same place (its first update turns it into a git checkout).
 
 ## 2. Run the installer (non-interactive)
 - **Mac**: `bash ~/ai-video-editor/setup/install-mac.sh --yes --editing-root "<folder>" --language <he|en|auto>`
@@ -33,6 +35,9 @@ from the repo page and extract it to the same place.
     `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
 - **Windows**: `powershell -ExecutionPolicy Bypass -File "$HOME\ai-video-editor\setup\install-windows.ps1" -Yes -EditingRoot "<folder>" -Language <he|en|auto>`
   - winget may show permission (UAC) pop-ups — tell the user to click **Yes** on them.
+
+If a step fails, fix what the error says and run the same command again — the installer is safe to re-run
+and keeps existing settings (`~/.mce/config.json`).
 
 The installer is long (several minutes, downloads ~2 GB of Python/Node packages). Run it in the
 background or with a long timeout and report progress per step (it prints `== n/8 ...`).
@@ -53,8 +58,8 @@ in `remotion/public/brand/` with `"logo": "brand/<file>"`. The graphics use thes
 1. **Restart Claude Code** (new skills and the new MCP server load only in a new session).
 2. **Restart Premiere Pro**, then **Window → Extensions → MCP for Adobe Premiere Pro** → make sure it
    says the connector is running (press Start if needed).
-3. Optional: put sound effects into `<editing folder>/SFX/<kind>/` (whoosh, pop, riser, impact, ding,
-   click, magic, glitch, minecraft) and ask Claude to "index the SFX library".
+3. Optional: put sound effects into `<editing folder>/SFX/<kind>/` (whoosh, pop, beep, click, shutter,
+   typing, riser, impact, ding, magic, glitch, minecraft) and ask Claude to "index the SFX library".
 
 Then tell them how to use it, in their language, e.g. open Claude Code in a project folder and say:
 "edit this recording into an 8-minute video", "make a short from this voiceover with this clip behind it",

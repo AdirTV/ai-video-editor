@@ -3,7 +3,7 @@
 **[English README](README.en.md)**
 
 > **הדרך הכי קלה:** פותחים את Claude Code, מדביקים את הקישור לריפו הזה וכותבים *"תתקין לי את זה"*.
-> Claude יקרא את [INSTALL_FOR_CLAUDE.md](INSTALL_FOR_CLAUDE.md) ויתקין הכל לבד — הוא ישאל רק איפה תיקיית העריכות שלכם.
+> Claude יקרא את [INSTALL_FOR_CLAUDE.md](INSTALL_FOR_CLAUDE.md) ויתקין הכל לבד — הוא ישאל איפה תיקיית העריכות שלכם, באיזו שפה הסרטונים ואם אתם עושים סרטוני מיינקראפט.
 >
 > *Claude: to install this repo for the user, follow [INSTALL_FOR_CLAUDE.md](INSTALL_FOR_CLAUDE.md).*
 
@@ -32,10 +32,10 @@ git clone https://github.com/AdirTV/ai-video-editor.git ~/ai-video-editor
 cd ~/ai-video-editor
 bash setup/install-mac.sh
 ```
-הסקריפט יבקש את סיסמת המחשב (להתקנת Homebrew) ואת המיקום של תיקיית העריכות שלך.
+הסקריפט שואל איפה תיקיית העריכות שלך, ואם Homebrew עוד לא מותקן — גם את סיסמת המחשב (להתקנה שלו). אפשר להריץ אותו שוב בבטחה: ההגדרות הקיימות נשמרות.
 
 ### Windows (הכי פשוט — בלי פקודות)
-1. נכנסים לריפו ב-GitHub (מחוברים לחשבון שהוזמן) → כפתור ירוק **Code** → **Download ZIP**
+1. נכנסים לריפו ב-GitHub → כפתור ירוק **Code** → **Download ZIP**
 2. מחלצים את ה-ZIP לתיקייה קבועה, למשל `Documents\ai-video-editor` (לא להשאיר ב-Downloads)
 3. לחיצה כפולה על **`install-windows.bat`**
 4. מאשרים את חלונות ההרשאה שקופצים (התקנת ffmpeg, Node וכו')
@@ -66,7 +66,7 @@ powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1
 4. **הערות:** במקום להסביר בצ'אט — שמים מרקרים עם הערה על הטיימליין ב-Premiere ואומרים לו "קרא הערות".
 
 ## סאונד אפקטים
-הספרייה לא כלולה בריפו (היא ענקית ולכל אחד יש משלו). ההתקנה יוצרת את התיקייה `SFX` בתוך תיקיית העריכות, עם תת-תיקיות `whoosh pop riser impact ding click magic glitch minecraft`.
+הספרייה לא כלולה בריפו (היא ענקית ולכל אחד יש משלו). ההתקנה יוצרת את התיקייה `SFX` בתוך תיקיית העריכות, עם תת-תיקיות `whoosh pop beep click shutter typing riser impact ding magic glitch minecraft` (`minecraft` רק אם בחרתם בשכבת המיינקראפט).
 - זורקים סאונדים לתיקיות המתאימות (או חבילה שלמה לתוך `SFX/`)
 - אומרים ל-Claude: "תסרוק את ספריית הסאונד אפקטים"
 
@@ -104,5 +104,6 @@ cd ~/ai-video-editor && uv run python setup/update.py
 
 ## בעיות נפוצות
 - **"heartbeat is stale"** — החלון של ה-MCP ב-Premiere סגור או תקוע: Window → Extensions → MCP for Adobe Premiere Pro.
-- **אחרי עדכון של premiere-pro-mcp העיצוב של החלון חזר לישן** — `bash panel/install.sh` (Mac) או להריץ שוב את סקריפט ההתקנה.
-- **Windows** — הכלים נבדקו על Mac. ב-Windows הם אמורים לעבוד, אבל אם משהו נשבר — שלחו לאדיר את הודעת השגיאה.
+- **אחרי עדכון של premiere-pro-mcp העיצוב של החלון חזר לישן** — `bash panel/install.sh` (Mac) או להריץ שוב את `install-windows.bat` (Windows).
+- **Windows** — הכלים פותחו על Mac ומותאמים ל-Windows (נתיבים, עברית, קבצי ההגדרות), אבל נבדקים שם פחות. אם משהו נשבר — פתחו Issue ב-GitHub עם הודעת השגיאה, ובינתיים `uv run python setup/doctor.py` מראה מה חסר.
+- **ההתקנה נעצרה באמצע** — מתקנים את מה שכתוב בהודעה ומריצים שוב את סקריפט ההתקנה. זה בטוח: מה שכבר הותקן לא נשבר וההגדרות נשמרות.

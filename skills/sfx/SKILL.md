@@ -12,23 +12,23 @@ Talk to the user in the language they write in.
 ## The library
 
 `{{SFX_LIB}}/`
-- **Curated kit** — `whoosh pop riser impact ding click magic glitch` folders (~8 each). Auto-placement
-  picks ONLY from these when a kind has any, so they define the sound of every edit. the user can audition,
-  delete what he dislikes, and drop favourites in.
-- **Packs** — any sound pack dropped into the library as its own folder is indexed too (used as fallback and for
-  specific picks). On the user's machine: **`Jota Pack/`** — 13.9k sounds (22 GB) from "Jota Biggest Minecraft Pack" (Whooshes, Impacts, Risers
-  and Swells, Notifications, Minecraft Sounds — every mob/block/UI sound —, Anime, Ed Edd Eddy, Hacking…).
-  Used as fallback for kinds with no curated sounds, and for specific picks.
+- **Curated kit** — one folder per kind (`whoosh pop beep click shutter typing riser impact ding magic glitch`,
+  created by the installer). Auto-placement picks ONLY from these when a kind has any, so they define the sound
+  of every edit. The user can audition, delete what they dislike, and drop favourites in.
+- **Packs** — any sound pack dropped into the library as its own folder is indexed too: used as fallback for
+  kinds with no curated sounds, and for specific picks (`search`). Look at the library's top-level folders to
+  see which packs this user has.
 - `minecraft`/`meme` kinds come from packs (game sounds — only relevant for Minecraft videos —, vine-boom style memes).
 
 Commands (from `{{MCE_HOME}}`):
-- `uv run python -m mce.sfx index` — rescan after adding/removing sounds (~30 s, parallel). Writes
-  `sfx_index.json` (kind, duration, **peak time**, loudness, path tags).
+- `uv run python -m mce.sfx index` — scan the library (parallel; only new/changed files are analyzed). Writes
+  `sfx_index.json` (kind, duration, **peak time**, loudness, path tags). Planning refreshes the index by itself
+  when sounds were added, removed or replaced, so this is only needed to see the counts.
 - `uv run python -m mce.sfx search rabbit hurt` — find specific sounds (all words must appear in the path).
   Use it for content-matched hits: a rabbit sound when a rabbit appears, "levelup" on an achievement,
   zombie groan for a zombie. Put the chosen file as an explicit hit (see below, `"file"` key) .
-- `uv run python -m mce.sfx starter` — rebuild the curated kit from the pack (only if the user asks; it
-  replaces what he curated — never run it over his own picks without asking).
+- `uv run python -m mce.sfx starter` — rebuild the curated kit from the packs (only if the user asks; it
+  replaces what they curated — never run it over their own picks without asking).
 
 Classification: Minecraft folders → `minecraft`; then filename keywords; then folder names; else `other`.
 
@@ -75,4 +75,4 @@ extra audio tracks (sweeps vs. hits) and never overlap on one track.
 - After rendering, listen-check isn't possible for you — check the plan's timings against the
   cut list and tell the user which hits to listen for.
 - Record the user's feedback on sounds (too many, too loud, favourite whoosh) in
-  `{{MCE_HOME}}/style.md` under "העדפות שנלמדו".
+  `{{MCE_HOME}}/style.md`, in its learned-preferences section ("העדפות שנלמדו" / "Learned preferences").
