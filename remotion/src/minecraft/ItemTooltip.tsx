@@ -1,9 +1,10 @@
-import { loadFont } from "@remotion/google-fonts/Heebo";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { HEEBO } from "../fonts";
+import { clamp, fadeOut } from "../pop";
 import { dir } from "../lang";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["800", "900"], subsets: ["hebrew", "latin"] });
+const fontFamily = HEEBO;
 
 // Minecraft's item hover tooltip (dark panel, purple gradient border) used as a price tag.
 // Lines appear one by one; a line with `count` rolls its number up from 0 (e.g. the yen price).
@@ -15,7 +16,7 @@ export const ItemTooltip: React.FC<Props<"ItemTooltip">> = ({
   const { fps, durationInFrames } = useVideoConfig();
   const u = 7 * scale;
   const pop = spring({ frame: f, fps, config: { damping: 10, stiffness: 200 } });
-  const out = interpolate(f, [durationInFrames - 8, durationInFrames], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const out = fadeOut(f, 8, durationInFrames);
 
   return (
     <AbsoluteFill style={{ alignItems: "center", paddingTop: top, opacity: out }}>
@@ -26,7 +27,7 @@ export const ItemTooltip: React.FC<Props<"ItemTooltip">> = ({
         {lines.map((l, i) => {
           const t0 = (l.at ?? i * 0.35) * fps;
           const s = spring({ frame: f - t0, fps, config: { damping: 12, stiffness: 220 } });
-          const n = l.count != null ? Math.round(l.count * interpolate(f - t0, [0, fps * 0.7], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })) : null;
+          const n = l.count != null ? Math.round(l.count * interpolate(f - t0, [0, fps * 0.7], [0, 1], clamp)) : null;
           const text = n != null ? `${l.prefix ?? ""}${n.toLocaleString("en-US")}${l.suffix ?? ""}` : l.text;
           return (
             <div key={i} style={{ fontFamily, fontWeight: i ? 800 : 900, fontSize: (i ? 13 : 16) * u, lineHeight: 1.25,

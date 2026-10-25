@@ -1,12 +1,11 @@
-import { loadFont } from "@remotion/google-fonts/Heebo";
-import { AbsoluteFill, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { HEEBO, MINECRAFT_TEN } from "../fonts";
+import { clamp, fadeOut } from "../pop";
 import { dir } from "../lang";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["800", "900"], subsets: ["hebrew", "latin"] });
-const mc = "MinecraftTen";
-const fontFace = `@font-face { font-family: ${mc}; src: url(${staticFile("mc/MinecraftTen.ttf")}); }`;
-
+const fontFamily = HEEBO;
+const mc = MINECRAFT_TEN;
 
 const fmt = (s: number) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60), cs = Math.floor((s * 100) % 100);
@@ -20,15 +19,14 @@ const fmt = (s: number) => {
 export const SpeedrunTimer: React.FC<Props<"SpeedrunTimer">> = ({ title = "Speedrun", category = "Any%", splits, from, to, scale = 1, corner = "tl" }) => {
   const f = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
-  const t = interpolate(f, [0, durationInFrames - 1], [from, to], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const t = interpolate(f, [0, durationInFrames - 1], [from, to], clamp);
   const slide = spring({ frame: f, fps, config: { damping: 18, stiffness: 160 } });
-  const out = interpolate(f, [durationInFrames - 12, durationInFrames], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const out = fadeOut(f, 12, durationInFrames);
   const u = scale;
   const side = corner === "tl" ? { left: 40 * u } : { right: 40 * u };
 
   return (
     <AbsoluteFill>
-      <style>{fontFace}</style>
       <div style={{ position: "absolute", top: 40 * u, ...side, width: 470 * u, opacity: out,
         translate: `${(corner === "tl" ? -1 : 1) * (1 - slide) * 560 * u}px 0`,
         background: "linear-gradient(#1b1b1bee, #0b0b0bee)", border: `${3 * u}px solid #000`, borderRadius: 8 * u,
@@ -39,7 +37,7 @@ export const SpeedrunTimer: React.FC<Props<"SpeedrunTimer">> = ({ title = "Speed
         </div>
         {splits.map((s, i) => {
           const done = t >= s.at;
-          const flash = interpolate(t - s.at, [0, (to - from) * 0.04], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+          const flash = interpolate(t - s.at, [0, (to - from) * 0.04], [1, 0], clamp);
           return (
             <div key={i} style={{ direction: dir(s.label), display: "flex", justifyContent: "space-between", alignItems: "center",
               padding: `${5 * u}px ${14 * u}px`, background: done && flash > 0 ? `rgba(80,200,90,${0.45 * flash})` : i % 2 ? "#ffffff08" : "transparent" }}>

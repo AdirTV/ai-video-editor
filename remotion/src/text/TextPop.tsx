@@ -1,12 +1,12 @@
-import { loadFont } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { RUBIK } from "../fonts";
+import { clamp } from "../pop";
 import { dir } from "../lang";
 import { brand } from "../brand";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew", "latin"] });
+const fontFamily = RUBIK;
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 // Animation Composer's "overshoot" curve (from a downloaded .aep): a damped cosine that tapers to 0 over the last 20%.
 const overshoot = (t: number, bounces: number, decay = 7) => {

@@ -25,10 +25,14 @@ import { schemas, type Cap, type Props } from "./schemas";
 // The shared graphics. Defaults are only for previewing in Studio; real renders pass --props.
 // Your own per-video compositions go in src/projects/<name>/ (not committed), see src/projects/README.md.
 
-const FPS = 60;
+// 60 fps by default. Override for a whole render with an env var, e.g. REMOTION_FPS=30 npx remotion render …
+// (Remotion passes REMOTION_* variables into the bundle). Some pop-in/out timings are counted in frames,
+// so at 30 fps those run twice as long — fine for a 30 fps edit, but 60 is what the looks were tuned at.
+const envFps = Number(typeof process !== "undefined" ? process.env?.REMOTION_FPS : undefined);
+const FPS = envFps > 0 ? envFps : 60;
 
-// duration from a "seconds" prop
-const bySeconds = ({ props }: { props: { seconds?: number } }) => ({ durationInFrames: Math.ceil((props.seconds ?? 1) * FPS) });
+// duration from a "seconds" prop (`dflt` when it isn't passed)
+const bySeconds = (dflt = 1) => ({ props }: { props: { seconds?: number } }) => ({ durationInFrames: Math.ceil((props.seconds ?? dflt) * FPS) });
 
 // Studio validates props against the schema, CLI renders don't: check here so bad --props fail with the field name.
 const checked = <P,>(id: string, schema: z.ZodType, then?: (a: { props: P }) => { durationInFrames: number }) =>
@@ -63,55 +67,55 @@ export const RemotionRoot: React.FC = () => {
   return (
     <>
       <Composition id="Captions" component={Captions} schema={schemas.Captions} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ caps: sampleCaps, top: 980, size: 118, seconds: 2 }} calculateMetadata={checked("Captions", schemas.Captions, bySeconds)} />
+        defaultProps={{ caps: sampleCaps, top: 980, size: 118, seconds: 2 }} calculateMetadata={checked("Captions", schemas.Captions, bySeconds())} />
       <Composition id="CTA" component={CTA} schema={schemas.CTA} durationInFrames={108} fps={FPS} width={1080} height={1920}
-        defaultProps={{ label: "לסרטון המלא" }} calculateMetadata={checked("CTA", schemas.CTA)} />
+        defaultProps={{ label: "לסרטון המלא" }} calculateMetadata={checked("CTA", schemas.CTA, bySeconds(1.8))} />
       <Composition id="BigText" component={BigText} schema={schemas.BigText} durationInFrames={78} fps={FPS} width={1080} height={1920}
-        defaultProps={{ text: "2027" }} calculateMetadata={checked("BigText", schemas.BigText)} />
+        defaultProps={{ text: "2027" }} calculateMetadata={checked("BigText", schemas.BigText, bySeconds(1.3))} />
       <Composition id="Sticker" component={Sticker} schema={schemas.Sticker} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ text: "חדש!", seconds: 1.2 }} calculateMetadata={checked("Sticker", schemas.Sticker, bySeconds)} />
+        defaultProps={{ text: "חדש!", seconds: 1.2 }} calculateMetadata={checked("Sticker", schemas.Sticker, bySeconds())} />
       <Composition id="TextPop" component={TextPop} schema={schemas.TextPop} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ text: "איזה מטורף!", seconds: 2 }} calculateMetadata={checked("TextPop", schemas.TextPop, bySeconds)} />
+        defaultProps={{ text: "איזה מטורף!", seconds: 2 }} calculateMetadata={checked("TextPop", schemas.TextPop, bySeconds())} />
       <Composition id="Alarm" component={Alarm} schema={schemas.Alarm} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ text: "זהירות!", seconds: 1.2 }} calculateMetadata={checked("Alarm", schemas.Alarm, bySeconds)} />
+        defaultProps={{ text: "זהירות!", seconds: 1.2 }} calculateMetadata={checked("Alarm", schemas.Alarm, bySeconds())} />
       <Composition id="Morph" component={Morph} schema={schemas.Morph} durationInFrames={60} fps={FPS} width={1080} height={1920}
-        defaultProps={{ from: "mc/Creeper.webp", to: "mc/Axolotl.webp", swapAt: 23 }} calculateMetadata={checked("Morph", schemas.Morph)} />
+        defaultProps={{ from: "mc/Creeper.webp", to: "mc/Axolotl.webp", swapAtSec: 0.38 }} calculateMetadata={checked("Morph", schemas.Morph, bySeconds(1))} />
       <Composition id="Frost" component={Frost} schema={schemas.Frost} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ grow: 1.2, tint: 0.22, seconds: 2 }} calculateMetadata={checked("Frost", schemas.Frost, bySeconds)} />
+        defaultProps={{ grow: 1.2, tint: 0.22, seconds: 2 }} calculateMetadata={checked("Frost", schemas.Frost, bySeconds())} />
       <Composition id="LightMeter" component={LightMeter} schema={schemas.LightMeter} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ label: "רמת אור", warn: "חזק מדי!", fill: 0.9, seconds: 1.6 }} calculateMetadata={checked("LightMeter", schemas.LightMeter, bySeconds)} />
+        defaultProps={{ label: "רמת אור", warn: "חזק מדי!", fill: 0.9, seconds: 1.6 }} calculateMetadata={checked("LightMeter", schemas.LightMeter, bySeconds())} />
       <Composition id="LottieFx" component={LottieFx} schema={schemas.LottieFx} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ emoji: "😂", size: 420, seconds: 2 }} calculateMetadata={checked("LottieFx", schemas.LottieFx, bySeconds)} />
+        defaultProps={{ emoji: "😂", size: 420, seconds: 2 }} calculateMetadata={checked("LottieFx", schemas.LottieFx, bySeconds())} />
       <Composition id="YouTubeCard" component={YouTubeCard} schema={schemas.YouTubeCard} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ seconds: 4.58, thumb: "core/thumb.png", title: "הסרטון המלא כבר בערוץ!", meta: "הועלה עכשיו", tapAt: 2.43 }} calculateMetadata={checked("YouTubeCard", schemas.YouTubeCard, bySeconds)} />
+        defaultProps={{ seconds: 4.58, thumb: "core/thumb.png", title: "הסרטון המלא כבר בערוץ!", meta: "הועלה עכשיו", tapAt: 2.43 }} calculateMetadata={checked("YouTubeCard", schemas.YouTubeCard, bySeconds())} />
       <Composition id="YouDied" component={YouDied} schema={schemas.YouDied} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ seconds: 1.6 }} calculateMetadata={checked("YouDied", schemas.YouDied, bySeconds)} />
+        defaultProps={{ seconds: 1.6 }} calculateMetadata={checked("YouDied", schemas.YouDied, bySeconds())} />
       <Composition id="Advancement" component={Advancement} schema={schemas.Advancement} fps={FPS} width={1920} height={1080} durationInFrames={60}
         defaultProps={{ seconds: 3, text: "מצאת יהלומים", icon: "Diamond.png", frame: "challenge" as const, scale: 1 }}
-        calculateMetadata={checked("Advancement", schemas.Advancement, bySeconds)} />
+        calculateMetadata={checked("Advancement", schemas.Advancement, bySeconds())} />
       <Composition id="AdvancementV" component={Advancement} schema={schemas.Advancement} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ seconds: 3, text: "נסעת בעגלה", icon: "Minecart.png", frame: "task" as const, scale: 0.8, top: 260, side: "center" as const }}
-        calculateMetadata={checked("AdvancementV", schemas.Advancement, bySeconds)} />
+        calculateMetadata={checked("AdvancementV", schemas.Advancement, bySeconds())} />
       <Composition id="ItemTooltip" component={ItemTooltip} schema={schemas.ItemTooltip} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ seconds: 3, lines: [
           { text: "חרב יהלום" },
           { text: "", count: 120, prefix: "₪", color: "#FFAA00", at: 0.3 } ] }}
-        calculateMetadata={checked("ItemTooltip", schemas.ItemTooltip, bySeconds)} />
+        calculateMetadata={checked("ItemTooltip", schemas.ItemTooltip, bySeconds())} />
       <Composition id="SpeedrunTimer" component={SpeedrunTimer} schema={schemas.SpeedrunTimer} fps={FPS} width={1920} height={1080} durationInFrames={60}
         defaultProps={{ seconds: 6, from: 0, to: 600, scale: 0.9, splits: [
           { label: "התחלה", at: 0 }, { label: "ברזל", at: 140 }, { label: "נת'ר", at: 380 }, { label: "סוף", at: 600 } ] }}
-        calculateMetadata={checked("SpeedrunTimer", schemas.SpeedrunTimer, bySeconds)} />
+        calculateMetadata={checked("SpeedrunTimer", schemas.SpeedrunTimer, bySeconds())} />
       <Composition id="RouteMap" component={RouteMap} schema={schemas.RouteMap} fps={FPS} width={1920} height={1080} durationInFrames={60}
         defaultProps={{ seconds: 5, size: 900, stops: [
           { x: 0.15, y: 0.2, label: "בית" }, { x: 0.4, y: 0.5, label: "תחנה", icon: "Minecart.png" },
           { x: 0.82, y: 0.82, label: "יעד" } ] }}
-        calculateMetadata={checked("RouteMap", schemas.RouteMap, bySeconds)} />
+        calculateMetadata={checked("RouteMap", schemas.RouteMap, bySeconds())} />
       <Composition id="FlightMap" component={FlightMap} schema={schemas.FlightMap} fps={FPS} width={1080} height={1920} durationInFrames={60}
-        defaultProps={{ seconds: 2.6 }} calculateMetadata={checked("FlightMap", schemas.FlightMap, bySeconds)} />
+        defaultProps={{ seconds: 2.6 }} calculateMetadata={checked("FlightMap", schemas.FlightMap, bySeconds())} />
       <Composition id="ChatMessage" component={ChatMessage} schema={schemas.ChatMessage} fps={FPS} width={1080} height={1920} durationInFrames={60}
         defaultProps={{ seconds: 3, user: "viewer_01", userColor: "#DAA520",
           parts: [{ text: "Greatest player of the year", at: 0 }, { text: "(only you play this game)", at: 1.2, big: true }] }}
-        calculateMetadata={checked("ChatMessage", schemas.ChatMessage, bySeconds)} />
+        calculateMetadata={checked("ChatMessage", schemas.ChatMessage, bySeconds())} />
       <Composition id="WordCards" component={WordCards} schema={schemas.WordCards} fps={FPS} width={1920} height={1080} durationInFrames={60}
         defaultProps={{ cards: sampleCards }} calculateMetadata={checkedCards("WordCards")} />
       <Composition id="WordCardsV" component={WordCards} schema={schemas.WordCards} fps={FPS} width={1080} height={1920} durationInFrames={60}

@@ -1,9 +1,9 @@
 import { AbsoluteFill, Easing, interpolate, random, useCurrentFrame, useVideoConfig } from "remotion";
+import { clamp } from "../../pop";
 
 // Building blocks of the documentary word-card look: blur-in entrance, blurred echo, RGB-split glitch,
 // film grain, vignette and a soft light pool.
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const ease = Easing.bezier(0.16, 1, 0.3, 1);
 
 // 0 → 1 over `dur` seconds from `at` (seconds of the current Sequence).
@@ -22,7 +22,9 @@ export const enterStyle = (p: number, rise = 0): React.CSSProperties => ({
 
 export const glow = (color: string, k = 1) => `0 0 ${8 * k}px ${color}, 0 0 ${22 * k}px ${color}, 0 0 ${48 * k}px ${color}aa`;
 
-// RGB split + horizontal slice displacement while `on`.
+// RGB split + horizontal slice displacement while `on`. Every slice is another full copy of the children, so
+// only slices that actually move (|dx| ≥ 4 px) are drawn, and there are 6 of them (was 9: same look, fewer copies).
+const SLICES = 6;
 export const Glitch: React.FC<{ on: boolean; strength?: number; children: React.ReactNode }> = ({ on, strength = 1, children }) => {
   const frame = useCurrentFrame();
   if (!on) return <AbsoluteFill>{children}</AbsoluteFill>;
@@ -30,10 +32,11 @@ export const Glitch: React.FC<{ on: boolean; strength?: number; children: React.
     <AbsoluteFill>
       <AbsoluteFill style={{ transform: `translateX(${-14 * strength}px)`, mixBlendMode: "screen", filter: "url(#wcRed)", opacity: 0.9 }}>{children}</AbsoluteFill>
       <AbsoluteFill style={{ transform: `translateX(${14 * strength}px)`, mixBlendMode: "screen", filter: "url(#wcCyan)", opacity: 0.9 }}>{children}</AbsoluteFill>
-      {new Array(9).fill(0).map((_, i) => {
+      {new Array(SLICES).fill(0).map((_, i) => {
         const top = random(`top${i}-${frame}`) * 100;
         const h = 2 + random(`h${i}-${frame}`) * 9;
         const dx = (random(`dx${i}-${frame}`) - 0.5) * 120 * strength;
+        if (Math.abs(dx) < 4) return null;
         return (
           <AbsoluteFill key={i} style={{ clipPath: `inset(${top}% 0 ${Math.max(0, 100 - top - h)}% 0)`, transform: `translateX(${dx}px)` }}>
             {children}
@@ -55,19 +58,23 @@ export const GlitchFilters: React.FC = () => (
   </svg>
 );
 
-// Film grain, re-seeded every other frame.
+// Film grain that changes every other frame. The noise is computed once (fixed seed, a bit larger than the frame)
+// and jumped to a random offset instead of re-running feTurbulence over the whole frame each time.
+const GRAIN_PAD = 160;
 export const Grain: React.FC<{ opacity?: number }> = ({ opacity = 0.14 }) => {
   const frame = useCurrentFrame();
   const { width, height } = useVideoConfig();
-  const seed = Math.floor(frame / 2) % 12;
+  const k = Math.floor(frame / 2) % 12;
+  const dx = Math.floor(random(`grainx${k}`) * GRAIN_PAD), dy = Math.floor(random(`grainy${k}`) * GRAIN_PAD);
   return (
-    <AbsoluteFill style={{ pointerEvents: "none", mixBlendMode: "overlay", opacity }}>
-      <svg width={width} height={height}>
-        <filter id={`wcGrain${seed}`}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed={seed} stitchTiles="stitch" />
+    <AbsoluteFill style={{ pointerEvents: "none", mixBlendMode: "overlay", opacity, overflow: "hidden" }}>
+      <svg width={width + GRAIN_PAD} height={height + GRAIN_PAD}
+        style={{ position: "absolute", left: 0, top: 0, transform: `translate(${-dx}px, ${-dy}px)`, willChange: "transform" }}>
+        <filter id="wcGrain">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed={0} stitchTiles="stitch" />
           <feColorMatrix type="saturate" values="0" />
         </filter>
-        <rect width="100%" height="100%" filter={`url(#wcGrain${seed})`} />
+        <rect width="100%" height="100%" filter="url(#wcGrain)" />
       </svg>
     </AbsoluteFill>
   );

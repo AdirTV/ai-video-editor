@@ -1,9 +1,10 @@
-import { loadFont } from "@remotion/google-fonts/Heebo";
 import { AbsoluteFill, Easing, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { HEEBO } from "../fonts";
+import { clamp, fadeOut } from "../pop";
 import { dir } from "../lang";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew", "latin"] });
+const fontFamily = HEEBO;
 
 type Stop = { x: number; y: number; label: string; icon?: string };
 
@@ -16,13 +17,13 @@ export const RouteMap: React.FC<Props<"RouteMap">> = ({
   const f = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const open = spring({ frame: f, fps, config: { damping: 14, stiffness: 120 } });
-  const out = interpolate(f, [durationInFrames - 14, durationInFrames], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const out = fadeOut(f, 14, durationInFrames);
 
   // legs animate one after another between 0.6 s and 85% of the clip
   const legs = upTo - fromLeg;
   const t0 = fps * 0.6, t1 = durationInFrames * 0.85;
   const prog = interpolate(f, [t0, t1], [fromLeg, upTo], {
-    extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic),
+    ...clamp, easing: Easing.inOut(Easing.cubic),
   });
   const leg = Math.min(Math.floor(prog), upTo - 1);
   const k = prog - leg;

@@ -1,14 +1,15 @@
 import { AbsoluteFill, Easing, Img, interpolate, random, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { popOpacity, popScale } from "../pop";
+import { clamp, popOpacity, popScale } from "../pop";
 import type { Props } from "../schemas";
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 // One mob turns into another: A pops in and wobbles, a flash + Minecraft
-// "poof" of square particles hides the swap at `swapAt`, then B pops out of it.
-export const Morph: React.FC<Props<"Morph">> = ({ from, to, swapAt }) => {
+// "poof" of square particles hides the swap at `swapAtSec`, then B pops out of it.
+// `swapAt` (a frame number) is the old prop, still honoured so earlier renders don't change.
+export const Morph: React.FC<Props<"Morph">> = ({ from, to, swapAtSec = 0.38, swapAt: swapAtFrame }) => {
   const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+  const { durationInFrames, fps } = useVideoConfig();
+  const swapAt = swapAtFrame ?? Math.round(swapAtSec * fps);
 
   const wobble = Math.sin(frame * 1.3) * interpolate(frame, [8, swapAt], [0, 1], clamp);
   const aShrink = interpolate(frame, [swapAt - 3, swapAt + 1], [1, 0], { ...clamp, easing: Easing.in(Easing.quad) });

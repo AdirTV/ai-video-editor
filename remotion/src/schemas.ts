@@ -8,6 +8,10 @@ import { z } from "zod";
 const seconds = z.number().positive().optional().describe("Length of the clip in seconds");
 const lang = z.enum(["he", "en"]).optional().describe("Language of the built-in labels (default he)");
 const color = zColor().optional();
+// Image paths: `public` = relative to remotion/public/ (e.g. "mc/Diamond.png", "projects/x/a.png");
+// `mc` = just a file name inside remotion/public/mc/ (e.g. "Diamond.png").
+const publicPath = (what: string, eg = "mc/Diamond.png") => `${what} — path relative to remotion/public/, e.g. "${eg}" or "projects/<name>/pic.png"`;
+const mcFile = (what: string) => `${what} — file name inside remotion/public/mc/ only (no folder), e.g. "Diamond.png"`;
 
 export const capSchema = z.object({
   start: z.number().describe("Start (s from the start of the clip)"),
@@ -36,10 +40,12 @@ export const schemas = {
   CTA: z.object({
     label: z.string().describe('e.g. "לסרטון המלא"'),
     accent: color.describe("Pill and arrow colour. Default: brand accent"),
+    seconds: seconds.describe("Length of the clip in seconds. Default 1.8"),
   }),
   BigText: z.object({
     text: z.string().describe('One huge word, e.g. "2027"'),
     color: color.describe("Default: brand accent"),
+    seconds: seconds.describe("Length of the clip in seconds. Default 1.3"),
   }),
   Sticker: z.object({
     seconds,
@@ -64,9 +70,11 @@ export const schemas = {
   }),
   Alarm: z.object({ seconds, text: z.string().optional(), lang }),
   Morph: z.object({
-    from: z.string().describe("Image under public/, e.g. mc/Creeper.webp"),
-    to: z.string().describe("Image it turns into"),
-    swapAt: z.number().describe("Frame of the swap (hidden by a flash + particles)"),
+    from: z.string().describe(publicPath("Image it starts as", "mc/Creeper.webp")),
+    to: z.string().describe(publicPath("Image it turns into", "mc/Axolotl.webp")),
+    swapAtSec: z.number().nonnegative().optional().describe("Second of the swap (hidden by a flash + particles). Default 0.38"),
+    swapAt: z.number().optional().describe("Deprecated: the swap as a frame number (old renders). Use swapAtSec"),
+    seconds: seconds.describe("Length of the clip in seconds. Default 1"),
   }),
   Frost: z.object({
     seconds,
@@ -79,8 +87,8 @@ export const schemas = {
   }),
   LottieFx: z.object({
     seconds,
-    src: z.string().optional().describe("Lottie JSON: URL or file under public/ (mce.lottie downloads to lottie/)"),
-    emoji: z.string().optional().describe('Animated Noto emoji instead of src, e.g. "😂"'),
+    src: z.string().optional().describe("Lottie JSON: URL, or a path relative to remotion/public/ (mce.lottie downloads to lottie/)"),
+    emoji: z.string().optional().describe('Animated Noto emoji instead of src, e.g. "😂" (cached in public/lottie/noto/ by npm run emoji, else fetched)'),
     size: z.number().optional().describe("px. Default 360"),
     x: z.number().optional(), y: z.number().optional().describe("Centre (px). Default: frame centre"),
     loop: z.boolean().optional(), speed: z.number().optional(), pop: z.boolean().optional(),
@@ -88,7 +96,7 @@ export const schemas = {
   }),
   YouTubeCard: z.object({
     seconds,
-    thumb: z.string().describe("Thumbnail under public/"),
+    thumb: z.string().describe(publicPath("Thumbnail", "core/thumb.png")),
     title: z.string(),
     channel: z.string().optional().describe("Default: brand channel"),
     meta: z.string().describe('e.g. "הועלה עכשיו"'),
@@ -100,7 +108,7 @@ export const schemas = {
     seconds,
     title: z.string().optional().describe("Default by frame: הישג חדש / מטרה הושגה / אתגר הושלם"),
     text: z.string(),
-    icon: z.string().describe("File in public/mc/, e.g. Diamond.png"),
+    icon: z.string().describe(mcFile("Icon")),
     frame: z.enum(["task", "goal", "challenge"]).optional().describe("challenge = purple, the rare one"),
     scale: z.number().optional(), top: z.number().optional(),
     side: z.enum(["right", "left", "center"]).optional(), lang,
@@ -108,7 +116,7 @@ export const schemas = {
   ItemTooltip: z.object({
     seconds,
     lines: z.array(z.object({
-      text: z.string(), color: color,
+      text: z.string(), color: color.describe("Line colour. Default white for the first line, grey after"),
       count: z.number().optional().describe("Number that rolls up from 0 (a price)"),
       prefix: z.string().optional(), suffix: z.string().optional(),
       at: z.number().optional().describe("Second this line appears"),
@@ -127,14 +135,17 @@ export const schemas = {
     seconds,
     stops: z.array(z.object({
       x: z.number().min(0).max(1), y: z.number().min(0).max(1), label: z.string(),
-      icon: z.string().optional().describe("File in public/mc/"),
+      icon: z.string().optional().describe(mcFile("Marker icon (default Map_Marker.png / Map_X.png on the last stop)")),
     })).describe("Positions 0..1 inside the map"),
     upTo: z.number().optional().describe("Legs to draw (bring the same map back later showing more)"),
     fromLeg: z.number().optional(), size: z.number().optional(),
   }),
   FlightMap: z.object({
     seconds, size: z.number().optional(), top: z.number().optional(),
-    from: point.optional(), to: point.optional(), km: z.number().optional().describe("Distance counter"),
+    from: point.optional().describe("Default Israel"), to: point.optional().describe("Default Japan"),
+    km: z.number().optional().describe("Distance counter"),
+    unit: z.string().optional().describe('Unit after the counter. Default by lang: "ק״מ" / "km"'),
+    lang,
   }),
   WordCards: z.object({
     cards: z.array(z.object({
@@ -149,9 +160,10 @@ export const schemas = {
       echo: z.boolean().optional().describe("Giant blurred copy of the keyword behind the card. Default true"),
       glitch: z.boolean().optional().describe("RGB-split glitch when the keyword lands and on the cut out"),
       layout: z.enum(["stack", "center"]).optional().describe("stack = right-aligned stack (default); center = small wide-tracked lines, the \"in this video…\" agenda look"),
-      icon: z.string().optional().describe("Image under public/ that floats next to the words, e.g. mc/Diamond.png"),
+      icon: z.string().optional().describe(publicPath("Image that floats next to the words")),
       iconSide: z.enum(["left", "right"]).optional(), iconSize: z.number().optional().describe("px at 1920 wide. Default 260"),
       zoom: z.number().optional().describe("Push-in over the card. Default 0.05"),
+      // eslint-disable-next-line @remotion/non-pure-animation -- a zod enum named "transition", not a CSS transition
       transition: z.enum(["zoom", "cut"]).optional().describe("How this card leaves: zoom = rushes at the camera and hangs as a blurred backdrop behind the next card (default); cut = hard cut"),
       start: z.number().optional().describe("Card cut (s). Default: just before its first word in the transcript"),
       end: z.number().optional().describe("Card end (s). Default: the next card's cut"),
@@ -160,7 +172,7 @@ export const schemas = {
     })).describe("Cards in order. Each line is found in the transcript after the previous card's words, so repeated words land right"),
     transcript: z.string().optional().describe("transcript.json from mce analyze, copied under public/ (e.g. projects/x/transcript.json)"),
     offset: z.number().optional().describe("Transcript second that is 0 of this clip. Default 0"),
-    audio: z.string().optional().describe("Voiceover under public/ to play under the cards (starts at offset)"),
+    audio: z.string().optional().describe("Voiceover, path relative to remotion/public/, to play under the cards (starts at offset)"),
     grain: z.boolean().optional().describe("Film grain over everything. Default true"),
     seconds,
     resolved: z.array(z.object({ start: z.number(), end: z.number(), at: z.record(z.string(), z.number()) })).optional()

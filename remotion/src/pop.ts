@@ -1,6 +1,10 @@
 import { Easing, interpolate } from "remotion";
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+// Shared interpolate options: hold the first/last value outside the input range.
+export const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+
+// 1 → 0 over the last `dur` frames of an element `n` frames long (a plain fade-out).
+export const fadeOut = (frame: number, dur: number, n: number) => interpolate(frame, [n - dur, n], [1, 0], clamp);
 
 // Pop in (overshoot) and pop out over the element's own [0, duration) frames.
 export const popScale = (frame: number, duration: number, inFrames = 9, outFrames = 6) =>

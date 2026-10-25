@@ -1,12 +1,13 @@
-import { loadFont } from "@remotion/google-fonts/Heebo";
 import { AbsoluteFill, Easing, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { dir } from "../lang";
+import { HEEBO } from "../fonts";
+import { clamp, fadeOut } from "../pop";
+import { dir, pick } from "../lang";
 import landgrid from "./landgrid.json";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew", "latin"] });
+const fontFamily = HEEBO;
 
-// Blocky map of Eurasia rasterized from Natural Earth 50m land (scripts_landgrid.mjs), 2° per cell.
+// Blocky map of Eurasia rasterized from Natural Earth 50m land (scripts/landgrid.mjs), 2° per cell.
 const { LON0, LAT0, STEP, grid } = landgrid as { LON0: number; LAT0: number; STEP: number; grid: string[] };
 const ROWS = grid.length, COLS = grid[0].length;
 const isLand = (c: number, r: number) => r >= 0 && r < ROWS && c >= 0 && c < COLS && grid[r][c] === "#";
@@ -14,13 +15,19 @@ const cell = (lon: number, lat: number) => ({ c: (lon - LON0) / STEP, r: (LAT0 -
 
 // Pixel world map that pops in, then a dashed flight path draws from `from` to `to`
 // with a plane riding the arc and a km counter ticking up.
-export const FlightMap: React.FC<Props<"FlightMap">> = ({ size = 880, top = 230, from = { lon: 35, lat: 31.8, label: "ישראל" }, to = { lon: 139.7, lat: 35.7, label: "יפן" }, km = 9200 }) => {
+// Labels and the unit follow `lang` (default he); each label's direction comes from its own text.
+export const FlightMap: React.FC<Props<"FlightMap">> = ({
+  lang, size = 880, top = 230, km = 9200,
+  from = { lon: 35, lat: 31.8, label: pick(lang, "ישראל", "Israel") },
+  to = { lon: 139.7, lat: 35.7, label: pick(lang, "יפן", "Japan") },
+  unit = pick(lang, "ק״מ", "km"),
+}) => {
   const f = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const pop = spring({ frame: f, fps, config: { damping: 11, stiffness: 170 } });
-  const out = interpolate(f, [durationInFrames - 10, durationInFrames], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const out = fadeOut(f, 10, durationInFrames);
   const p = interpolate(f, [fps * 0.35, durationInFrames - fps * 0.35], [0, 1], {
-    extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.inOut(Easing.cubic),
+    ...clamp, easing: Easing.inOut(Easing.cubic),
   });
 
   const W = size, H = (size * ROWS) / COLS;
@@ -71,9 +78,9 @@ export const FlightMap: React.FC<Props<"FlightMap">> = ({ size = 880, top = 230,
             rotate: `${ang + 45}deg`, fontSize: px * 2.6, lineHeight: 1, opacity: p < 1 ? 1 : 0 }}>✈️</div>
         </div>
       </div>
-      <div style={{ marginTop: px * 1.6, fontFamily, fontWeight: 900, fontSize: px * 2.1, color: "#fff", direction: "rtl",
+      <div style={{ marginTop: px * 1.6, fontFamily, fontWeight: 900, fontSize: px * 2.1, color: "#fff", direction: dir(unit),
         textShadow: `${px * 0.2}px ${px * 0.2}px 0 #000`, scale: `${pop}` }}>
-        {Math.round(km * p).toLocaleString("en-US")} ק״מ
+        {Math.round(km * p).toLocaleString("en-US")} {unit}
       </div>
     </AbsoluteFill>
   );

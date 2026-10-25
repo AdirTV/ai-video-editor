@@ -1,7 +1,9 @@
-// Rasterize Natural Earth land (50m) into a coarse grid for the pixel FlightMap.
+// Rasterize Natural Earth land (50m) into a coarse grid for the pixel FlightMap -> src/maps/landgrid.json.
+// Run from anywhere:  node scripts/landgrid.mjs   (needs the devDependencies topojson-client + world-atlas)
 import fs from "node:fs";
 import { feature } from "topojson-client";
-const topo = JSON.parse(fs.readFileSync("node_modules/world-atlas/land-50m.json", "utf8"));
+const ROOT = new URL("..", import.meta.url);
+const topo = JSON.parse(fs.readFileSync(new URL("node_modules/world-atlas/land-50m.json", ROOT), "utf8"));
 const land = feature(topo, topo.objects.land);
 const polys = land.features.flatMap(f => f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates);
 const inRing = (x, y, ring) => { let ins = false;
@@ -19,5 +21,5 @@ for (let r = 0; r < rows; r++) { let row = "";
       n += isLand(LON0 + (c + (a + 0.5) / 4) * STEP, LAT0 - (r + (b + 0.5) / 4) * STEP) ? 1 : 0;
     row += n >= 5 ? "#" : "."; }
   grid.push(row); }
-fs.writeFileSync("src/maps/landgrid.json", JSON.stringify({ LON0, LAT0, STEP, grid }));
+fs.writeFileSync(new URL("src/maps/landgrid.json", ROOT), JSON.stringify({ LON0, LAT0, STEP, grid }));
 console.log(grid.join("\n"));

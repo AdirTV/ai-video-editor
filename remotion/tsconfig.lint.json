@@ -1,0 +1,6 @@
+{
+  // `npm run lint` type-checks the shared code only; src/projects/ (personal, gitignored) is loaded at runtime
+  // through require.context, so nothing shared depends on it. Editors still use tsconfig.json, which includes it.
+  "extends": "./tsconfig.json",
+  "exclude": ["remotion.config.ts", "scripts", "src/projects"]
+}

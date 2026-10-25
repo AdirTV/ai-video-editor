@@ -1,11 +1,11 @@
-import { loadFont } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { RUBIK } from "../fonts";
 import { popOpacity, popScale } from "../pop";
 import { dir } from "../lang";
 import { brand } from "../brand";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew", "latin"] });
+const fontFamily = RUBIK;
 
 // A tilted label that pops in (e.g. "חדש!", "מערות הקרח") — block pill with a hard shadow.
 export const Sticker: React.FC<Props<"Sticker">> = ({

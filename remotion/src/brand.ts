@@ -7,5 +7,5 @@ type Brand = typeof defaults;
 const ctx = require.context("../..", false, /^\.\/brand\.json$/);
 // the gallery renders with the neutral defaults, whoever runs it
 const gallery = typeof process !== "undefined" && process.env?.REMOTION_GALLERY;
-const local: Partial<Brand> = ctx.keys().length && !gallery ? (ctx(ctx.keys()[0]).default ?? ctx(ctx.keys()[0])) : {};
+const local = (ctx.keys().length && !gallery ? (ctx(ctx.keys()[0]).default ?? ctx(ctx.keys()[0])) : {}) as Partial<Brand>;
 export const brand: Brand = { ...defaults, ...local };

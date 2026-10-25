@@ -1,12 +1,11 @@
-import { loadFont } from "@remotion/google-fonts/Inter";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { popOpacity, popScale } from "../pop";
+import { INTER } from "../fonts";
+import { clamp, popOpacity, popScale } from "../pop";
 import { dir } from "../lang";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["600", "800", "900"], subsets: ["latin"] });
+const fontFamily = INTER;
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 // A live-chat message the streamer reacts to (Twitch-style dark card, coloured username). The message can
 // arrive in parts: each part appears at its own second, and a `big` part slams in on its own line with a
@@ -63,6 +62,7 @@ const Slam: React.FC<{ text: string; at: number; size: number; color: string }> 
     <div
       style={{
         fontSize: size, fontWeight: 900, color, lineHeight: 1.1, marginTop: size * 0.18, textWrap: "balance",
+        direction: dir(text), unicodeBidi: "plaintext",
         scale: interpolate(t, [0, 5, 9], [2.2, 0.92, 1], { ...clamp, easing: Easing.out(Easing.quad) }),
         opacity: interpolate(t, [0, 2], [0, 1], clamp), textShadow: `0 0 ${size * 0.35}px ${color}66`,
       }}

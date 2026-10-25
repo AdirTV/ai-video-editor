@@ -7,7 +7,7 @@ const ctx = require.context("./projects", true, /^\.\/[a-z0-9-]+\/index\.tsx$/);
 export const ProjectCompositions: React.FC = () => (
   <>
     {ctx.keys().map((key) => {
-      const C: React.FC | undefined = ctx(key).Compositions;
+      const C = ctx(key).Compositions as React.FC | undefined;
       return C ? <Folder key={key} name={key.split("/")[1]}><C /></Folder> : null;
     })}
   </>

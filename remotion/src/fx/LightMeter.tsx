@@ -1,11 +1,10 @@
-import { loadFont } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { popOpacity, popScale } from "../pop";
+import { RUBIK } from "../fonts";
+import { clamp, popOpacity, popScale } from "../pop";
 import { dir, pick } from "../lang";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["900"], subsets: ["hebrew", "latin"] });
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+const fontFamily = RUBIK;
 
 // Pixel torch (16×16 grid).
 const Torch: React.FC<{ size: number; glow: number }> = ({ size, glow }) => (

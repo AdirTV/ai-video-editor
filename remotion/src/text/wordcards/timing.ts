@@ -1,3 +1,5 @@
+import { norm } from "../../lang";
+
 // Turns WordCards props into absolute timings: each card's base/keyword/script line is matched to the
 // first unused transcript word(s) that spell it, in order, so the cards land on the voice without hand-typed seconds.
 // Pure TS (no JSX) so calculateMetadata can run it before the component renders.
@@ -21,9 +23,7 @@ export type CardIn = {
 
 export type Resolved = { start: number; end: number; at: Partial<Record<Part, number>> };
 
-// Strip punctuation, niqqud and case so "מיינקראפט," matches "מיינקראפט".
-export const norm = (s: string) =>
-  s.normalize("NFKD").replace(/[֑-ׇ]/g, "").replace(/[^\p{L}\p{N}]+/gu, "").toLowerCase();
+export { norm };
 
 export const flatten = (segs: TSegment[]): TWord[] => segs.flatMap((s) => s.words ?? []);
 

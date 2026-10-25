@@ -1,11 +1,12 @@
-import { loadFont } from "@remotion/google-fonts/Rubik";
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { RUBIK } from "../fonts";
+import { clamp, fadeOut } from "../pop";
 import { dir, pick } from "../lang";
 import { brand } from "../brand";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["500", "700", "900"], subsets: ["hebrew", "latin"] });
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+const fontFamily = RUBIK;
+const AMB = 8; // downscale factor of the ambient glow
 
 // "The full video is up": the thumbnail on a YouTube-style watch page (dark mode + ambient glow),
 // card springs in, slow push, then a finger tap on the video at `tapAt` seconds.
@@ -15,18 +16,21 @@ export const YouTubeCard: React.FC<Props<"YouTubeCard">> = ({ thumb, title, chan
   const src = staticFile(thumb);
   const enter = interpolate(frame, [0, 16], [0, 1], { ...clamp, easing: Easing.out(Easing.back(1.6)) });
   const push = interpolate(frame, [0, durationInFrames], [1, 1.05], clamp);
-  const out = interpolate(frame, [durationInFrames - 6, durationInFrames], [1, 0], clamp);
+  const out = fadeOut(frame, 6, durationInFrames);
   const tf = tapAt * fps;
   const press = interpolate(frame, [tf - 4, tf, tf + 6], [1, 0.95, 1], clamp);
   const ripple = interpolate(frame, [tf, tf + 18], [0, 1], clamp);
   const finger = interpolate(frame, [tf - 18, tf - 2], [0, 1], { ...clamp, easing: Easing.out(Easing.quad) });
   const prog = interpolate(frame, [tf, durationInFrames], [0, 0.12], clamp);
   const W = 1000, H = Math.round((W * 941) / 1672), X = 40, Y = 250;
+  const badge = pick(lang, "חדש!", "NEW!");
   return (
     <AbsoluteFill style={{ background: "#0f0f0f", opacity: out, fontFamily }}>
-      {/* ambient mode glow */}
-      <Img src={src} style={{ position: "absolute", left: -200, top: Y - 260, width: 1480, height: H + 520,
-        objectFit: "cover", filter: "blur(90px) saturate(1.6)", opacity: 0.55 }} />
+      {/* ambient mode glow: drawn at 1/8 size with a 1/8 blur, then scaled up — looks the same as
+          blur(90px) on the full-size image at a fraction of the cost per frame */}
+      <Img src={src} style={{ position: "absolute", left: -200, top: Y - 260, width: 1480 / AMB, height: (H + 520) / AMB,
+        objectFit: "cover", filter: `blur(${90 / AMB}px) saturate(1.6)`, opacity: 0.55,
+        transform: `scale(${AMB})`, transformOrigin: "0 0" }} />
       <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(15,15,15,0) 0%, rgba(15,15,15,0) 45%, #0f0f0f 70%)" }} />
       {/* top bar */}
       <div style={{ position: "absolute", top: 120, left: 40, right: 40, display: "flex", alignItems: "center", gap: 14,
@@ -44,7 +48,7 @@ export const YouTubeCard: React.FC<Props<"YouTubeCard">> = ({ thumb, title, chan
             <div style={{ width: `${prog * 100}%`, height: "100%", background: "#ff0033" }} />
           </div>
           <div style={{ position: "absolute", top: 22, right: 22, background: "#ff0033", color: "#fff", fontWeight: 900,
-            fontSize: 44, padding: "4px 22px 8px", borderRadius: 12, direction: dir(title) }}>{pick(lang, "חדש!", "NEW!")}</div>
+            fontSize: 44, padding: "4px 22px 8px", borderRadius: 12, direction: dir(badge) }}>{badge}</div>
           {/* tap ripple */}
           <div style={{ position: "absolute", left: W / 2 - 160, top: H / 2 - 160, width: 320, height: 320, borderRadius: "50%",
             background: "rgba(255,255,255,.35)", scale: ripple * 1.6, opacity: ripple > 0 ? 1 - ripple : 0 }} />
@@ -65,8 +69,9 @@ export const YouTubeCard: React.FC<Props<"YouTubeCard">> = ({ thumb, title, chan
               : <div style={{ width: 92, height: 92, borderRadius: "50%", background: "linear-gradient(135deg,#ff3b3b,#8b0000)",
                   border: "4px solid #333" }} />}
             <span style={{ fontSize: 42, fontWeight: 700 }}>{channel}</span>
-            <div style={{ marginRight: "auto", background: "#f1f1f1", color: "#0f0f0f", fontSize: 38, fontWeight: 700,
-              padding: "14px 36px 18px", borderRadius: 60 }}>הרשמה</div>
+            {/* pushed to the far end of the row in either direction */}
+            <div style={{ marginInlineStart: "auto", background: "#f1f1f1", color: "#0f0f0f", fontSize: 38, fontWeight: 700,
+              padding: "14px 36px 18px", borderRadius: 60 }}>{pick(lang, "הרשמה", "Subscribe")}</div>
           </div>
         </div>
       </div>

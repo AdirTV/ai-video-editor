@@ -1,4 +1,5 @@
 import { AbsoluteFill, Easing, Freeze, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
+import { clamp } from "../../pop";
 
 // "Zoom-through" cut between cards, measured frame by frame off the reference opener: ~5 frames before the cut
 // the outgoing card starts rushing at the camera (scale 1 → ~3, accelerating, blurring); the next card cuts in at
@@ -9,7 +10,6 @@ export const LEAD = 0.15; // seconds the rush starts before the cut
 const RUSH = 0.2; // seconds of the fast part
 export const HOLD = 0.75; // seconds the backdrop stays after the cut
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 // t = seconds since the rush began
 export const rushStyle = (t: number, origin = "50% 45%"): React.CSSProperties => {

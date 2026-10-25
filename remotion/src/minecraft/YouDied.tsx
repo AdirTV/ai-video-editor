@@ -1,9 +1,9 @@
-import { loadFont } from "@remotion/google-fonts/PixelifySans";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { PIXELIFY } from "../fonts";
+import { clamp, fadeOut } from "../pop";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["700"], subsets: ["latin"] });
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+const fontFamily = PIXELIFY;
 
 const Button: React.FC<{ label: string; delay: number }> = ({ label, delay }) => {
   const frame = useCurrentFrame();
@@ -40,7 +40,7 @@ export const YouDied: React.FC<Props<"YouDied">> = () => {
   const cracks = interpolate(frame, [0, 4, 20, 30], [0, 1, 1, 0], clamp);
   const red = interpolate(frame, [4, 18], [0, 1], clamp);
   const title = interpolate(frame, [10, 24], [2.2, 1], { ...clamp, easing: Easing.out(Easing.back(2)) });
-  const out = interpolate(frame, [durationInFrames - 8, durationInFrames], [1, 0], clamp);
+  const out = fadeOut(frame, 8, durationInFrames);
   return (
     <AbsoluteFill style={{ fontFamily, opacity: out }}>
       <AbsoluteFill

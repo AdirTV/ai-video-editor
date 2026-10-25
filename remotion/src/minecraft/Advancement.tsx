@@ -1,9 +1,10 @@
-import { loadFont } from "@remotion/google-fonts/Heebo";
 import { AbsoluteFill, Easing, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { HEEBO } from "../fonts";
+import { clamp } from "../pop";
 import { dir, pick } from "../lang";
 import type { Props } from "../schemas";
 
-const { fontFamily } = loadFont("normal", { weights: ["800", "900"], subsets: ["hebrew", "latin"] });
+const fontFamily = HEEBO;
 
 // Minecraft's text shadow: a hard copy offset down-right in a darker shade.
 const mcShadow = (px: number, c: string) => `${px}px ${px}px 0 ${c}`;
@@ -15,12 +16,12 @@ export const Advancement: React.FC<Props<"Advancement">> = ({ title, text, icon,
   const { fps, durationInFrames } = useVideoConfig();
   const inP = spring({ frame: f, fps, config: { damping: 16, stiffness: 140, mass: 0.8 } });
   const outP = interpolate(f, [durationInFrames - 16, durationInFrames], [0, 1], {
-    extrapolateLeft: "clamp", extrapolateRight: "clamp", easing: Easing.in(Easing.cubic),
+    ...clamp, easing: Easing.in(Easing.cubic),
   });
   const y = interpolate(inP, [0, 1], [-260, 0]) + interpolate(outP, [0, 1], [0, -260]);
   // icon pops a beat after the panel lands
   const iconS = spring({ frame: f - 8, fps, config: { damping: 9, stiffness: 220 } });
-  const shine = interpolate(f, [10, 40], [-120, 220], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const shine = interpolate(f, [10, 40], [-120, 220], clamp);
 
   const titleColor = kind === "challenge" ? "#FF55FF" : "#FFFF55";
   const titleText = title ?? (kind === "challenge" ? pick(lang, "אתגר הושלם!", "Challenge Complete!")

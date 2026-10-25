@@ -1,7 +1,7 @@
 import { AbsoluteFill, interpolate, random, useCurrentFrame, useVideoConfig } from "remotion";
+import { clamp, fadeOut } from "../pop";
 import type { Props } from "../schemas";
 
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 // A six-armed pixel-ish snowflake.
 const Flake: React.FC<{ size: number; color: string }> = ({ size, color }) => (
@@ -24,7 +24,7 @@ export const Frost: React.FC<Props<"Frost">> = ({ grow = 1.2, tint = 0.22 }) => 
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const k = interpolate(frame, [0, grow * fps], [0, 1], clamp);
-  const out = interpolate(frame, [durationInFrames - 10, durationInFrames], [1, 0], clamp);
+  const out = fadeOut(frame, 10, durationInFrames);
   const flakes = Array.from({ length: 46 }, (_, i) => {
     // spread on the border band
     const side = i % 4;
@@ -45,22 +45,24 @@ export const Frost: React.FC<Props<"Frost">> = ({ grow = 1.2, tint = 0.22 }) => 
           background: `radial-gradient(ellipse at center, rgba(255,255,255,0) ${inner}%, rgba(200,235,255,${0.55 * k}) 100%)`,
         }}
       />
-      {flakes.map((f, i) => (
-        <div
-          key={i}
-          style={{
-            position: "absolute",
-            left: f.x - f.size / 2,
-            top: f.y - f.size / 2,
-            scale: f.s,
-            rotate: `${f.rot}deg`,
-            opacity: 0.9 * f.s,
-            filter: "drop-shadow(0 0 6px rgba(160,220,255,.9))",
-          }}
-        >
-          <Flake size={f.size} color={i % 3 ? "#e8f7ff" : "#9fdcff"} />
-        </div>
-      ))}
+      {/* one glow for all flakes instead of a drop-shadow filter per flake */}
+      <AbsoluteFill style={{ filter: "drop-shadow(0 0 6px rgba(160,220,255,.9))" }}>
+        {flakes.map((f, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: f.x - f.size / 2,
+              top: f.y - f.size / 2,
+              scale: f.s,
+              rotate: `${f.rot}deg`,
+              opacity: 0.9 * f.s,
+            }}
+          >
+            <Flake size={f.size} color={i % 3 ? "#e8f7ff" : "#9fdcff"} />
+          </div>
+        ))}
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };

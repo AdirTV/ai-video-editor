@@ -1,29 +1,32 @@
-import { loadFont as loadHeebo } from "@remotion/google-fonts/Heebo";
-import { loadFont as loadRubik } from "@remotion/google-fonts/Rubik";
-import { loadFont as loadCarlito } from "@remotion/google-fonts/Carlito";
-import { AbsoluteFill, Sequence, continueRender, delayRender, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import { popOpacity, popScale } from "../pop";
-import { dir } from "../lang";
+import { dir, norm } from "../lang";
+import { CARLITO, HEEBO, MINECRAFTIA, RUBIK } from "../fonts";
 import { brand } from "../brand";
 import type { Cap, Props } from "../schemas";
 
 const FONTS = {
-  rubik: loadRubik("normal", { weights: ["900"], subsets: ["hebrew", "latin"] }).fontFamily,
-  heebo: loadHeebo("normal", { weights: ["900"], subsets: ["hebrew", "latin"] }).fontFamily,
-  // Calibri-metric font: the stream-clip / podcast-short caption look
-  carlito: loadCarlito("normal", { weights: ["700"], subsets: ["latin"] }).fontFamily,
-  // Minecraft pixel font (the "Minecraft, but…" short-channel caption look)
-  minecraft: "Minecraftia",
+  rubik: RUBIK,
+  heebo: HEEBO,
+  // Calibri-metric font: the stream-clip / podcast-short caption look (Hebrew falls back to Heebo)
+  carlito: CARLITO,
+  // Minecraft pixel font (the "Minecraft, but…" short-channel caption look); a missing file fails the render
+  minecraft: MINECRAFTIA,
 };
-if (typeof document !== "undefined" && typeof FontFace !== "undefined") {
-  const handle = delayRender("Minecraftia font");
-  new FontFace("Minecraftia", `url(${staticFile("mc/Minecraftia.ttf")})`).load()
-    .then((f) => { document.fonts.add(f); continueRender(handle); })
-    .catch(() => continueRender(handle));
-}
 // Average glyph width per font (em), used to keep a caption on one line.
 const WIDTH: Record<string, number> = { minecraft: 0.66 };
 type Font = keyof typeof FONTS;
+
+// Highlight colour of a word: hl keys and words are compared without punctuation/niqqud/case,
+// so {"GTA": …} also colours "GTA," and "gta!".
+const hlColor = (hl: Cap["hl"], w: string) => {
+  if (!hl) return undefined;
+  if (hl[w]) return hl[w];
+  const k = norm(w);
+  if (!k) return undefined;
+  for (const [key, c] of Object.entries(hl)) if (norm(key) === k) return c;
+  return undefined;
+};
 
 export type { Cap } from "../schemas";
 
@@ -31,7 +34,7 @@ export type { Cap } from "../schemas";
 // (the clip-channel look: game on top, face below, captions on the seam).
 type Look = "bold" | "stream" | "karaoke" | "mc";
 const LOOKS = {
-  bold: { color: "white", stroke: "#111", strokeK: 0.15, shadow: (s: number) => "0 10px 0 #111", weight: 900, pop: 1 },
+  bold: { color: "white", stroke: "#111", strokeK: 0.15, shadow: () => "0 10px 0 #111", weight: 900, pop: 1 },
   karaoke: { color: "white", stroke: "#000", strokeK: 0.11, shadow: (s: number) => `0 ${Math.round(s * 0.05)}px ${Math.round(s * 0.1)}px rgba(0,0,0,.75)`, weight: 700, pop: 0.15 },
   // Minecraft-short look: pixel font, white, hard black outline + hard drop shadow
   mc: { color: "white", stroke: "#000", strokeK: 0.14, shadow: (s: number) => `${Math.round(s * 0.07)}px ${Math.round(s * 0.07)}px 0 #000`, weight: 900, pop: 0.6 },
@@ -66,7 +69,7 @@ const Word: React.FC<{ cap: Cap; frames: number; size: number; font: Font; look:
       }}
     >
       {cap.text.split(" ").map((w, i) => (
-        <span key={i} style={{ color: cap.hl?.[w] ?? base }}>
+        <span key={i} style={{ color: hlColor(cap.hl, w) ?? base }}>
           {(i ? " " : "") + w}
         </span>
       ))}
@@ -100,18 +103,18 @@ const Karaoke: React.FC<{ cap: Cap; frames: number; size: number; font: Font }> 
   let k = 0;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", scale: pop,
-      opacity: popOpacity(frame, frames), direction: dir(cap.text) }}>
+      opacity: popOpacity(frame, frames), direction: dir(cap.text), unicodeBidi: "plaintext" }}>
       {lines(ws).map((ln, li) => {
         const chars = ln.reduce((n, w) => n + w.length * (big.has(w) ? 1.5 : 1), 0) + ln.length - 1;
         const fs = Math.min(size, 960 / (chars * 0.5));  // each line fits the safe width
         return (
           <div key={li} style={{ fontFamily: FONTS[font], fontWeight: L.weight, fontSize: fs, lineHeight: 1.08,
-            whiteSpace: "nowrap", WebkitTextStroke: `${Math.round(fs * L.strokeK)}px ${L.stroke}`,
+            whiteSpace: "nowrap", unicodeBidi: "plaintext", WebkitTextStroke: `${Math.round(fs * L.strokeK)}px ${L.stroke}`,
             paintOrder: "stroke fill", textShadow: L.shadow(fs) }}>
             {ln.map((w, i) => {
               const at = cap.words?.[k++] ?? 0;
               return (
-                <span key={i} style={{ color: cap.hl?.[w] ?? SPOKEN, opacity: t >= at ? 1 : UPCOMING,
+                <span key={i} style={{ color: hlColor(cap.hl, w) ?? SPOKEN, opacity: t >= at ? 1 : UPCOMING,
                   fontSize: big.has(w) ? "1.5em" : undefined }}>
                   {(i ? " " : "") + w}
                 </span>

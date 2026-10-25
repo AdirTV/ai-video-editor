@@ -1,18 +1,17 @@
 import { Fragment } from "react";
-import { loadFont as loadHeebo } from "@remotion/google-fonts/Heebo";
-import { loadFont as loadKarantina } from "@remotion/google-fonts/Karantina";
-import { loadFont as loadGveret } from "@remotion/google-fonts/GveretLevin";
 import { AbsoluteFill, Audio, Img, interpolate, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { brand } from "../brand";
+import { GVERET, HEEBO, KARANTINA } from "../fonts";
+import { clamp } from "../pop";
 import { dir } from "../lang";
 import type { Props } from "../schemas";
 import { enterStyle, glow, Glitch, GlitchFilters, Grain, Pool, useEnter, Vignette } from "./wordcards/fx";
 import { ZoomTail } from "./wordcards/transition";
 import { flatten, resolve, type Resolved, type TSegment } from "./wordcards/timing";
 
-const BASE = loadHeebo("normal", { weights: ["500", "800", "900"], subsets: ["hebrew", "latin"] }).fontFamily;
-const BIG = loadKarantina("normal", { weights: ["700"], subsets: ["hebrew", "latin"] }).fontFamily;
-const SCRIPT = loadGveret("normal", { weights: ["400"], subsets: ["hebrew", "latin"] }).fontFamily;
+const BASE = HEEBO;
+const BIG = KARANTINA;
+const SCRIPT = GVERET;
 
 type P = Props<"WordCards">;
 type CardP = P["cards"][number];
@@ -25,8 +24,6 @@ const THEMES: Record<Theme, { bg?: string; pool?: string; ink: string; grade?: s
   mono: { bg: "#000", pool: "70,70,70", ink: "#f4f4f4", grade: "grayscale(1)" },
   clear: { ink: "#f4f4f4" },
 };
-
-const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
 // Keyword size that keeps the line inside `maxW` (Karantina is narrow: ~0.36 em per letter).
 const fit = (text: string, want: number, maxW: number, em = 0.36) => Math.min(want, maxW / Math.max(1, text.length * em));
