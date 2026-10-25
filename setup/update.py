@@ -7,7 +7,6 @@ Double-click: update-mac.command (Mac) / update-windows.bat (Windows).
 Your personal files (style.md, vocab.txt, brand.json, remotion/src/projects/, media) are never touched.
 A ZIP install (no git) is turned into a git checkout on the first update, so later updates are one step.
 """
-import json
 import platform
 import re
 import shutil
@@ -41,22 +40,40 @@ def step(t: str) -> None:
     print(f"\n== {t}")
 
 
-def mcp_version() -> str:
-    """premiere-pro-mcp version the installers pin."""
-    m = re.search(r"premiere-pro-mcp@([\d.]+)", (REPO / "setup" / "install-mac.sh").read_text())
-    return m.group(1) if m else ""
+def mcp_version(rev: str | None = None) -> str:
+    """premiere-pro-mcp version pinned in mce/config.py (older versions pinned it in setup/install-mac.sh)."""
+    for path, pat in (("mce/config.py", r'PREMIERE_MCP_VERSION = "([\d.]+)"'), ("setup/install-mac.sh", r"premiere-pro-mcp@([\d.]+)")):
+        text = git("show", f"{rev}:{path}", check=False) if rev else (REPO / path).read_text(encoding="utf-8")
+        if m := re.search(pat, text):
+            return m.group(1)
+    return ""
 
 
 def fetch() -> bool:
-    r = subprocess.run(["git", "fetch", "-q", "origin", BRANCH], cwd=REPO, capture_output=True, text=True, timeout=60)
+    try:
+        r = subprocess.run(["git", "fetch", "-q", "origin", BRANCH], cwd=REPO, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=60)
+    except subprocess.TimeoutExpired:
+        print("⚠️  Couldn't reach GitHub (timed out) — skipping the update for now.")
+        return False
     if r.returncode:
         print("⚠️  Couldn't reach GitHub:", (r.stderr.strip().splitlines() or ["?"])[-1])
-        print("   (offline, or this GitHub account has no access to the repo: run `gh auth login`)")
+        print("   (offline, or the network blocks GitHub — try again later)")
     return r.returncode == 0
+
+
+# The last version whose packages/panel/skills were applied on this computer. Kept inside .git so it's
+# never committed. If an update stops halfway (say npm failed), the next run re-applies from here.
+APPLIED = REPO / ".git" / "mce-applied"
 
 
 if not shutil.which("git"):
     sys.exit("❌ git is missing. Windows: winget install --id Git.Git -e | Mac: xcode-select --install — then run this again.")
+
+if "--check" in sys.argv and not (REPO / ".git").exists():
+    print("ℹ️  This is a ZIP install, so it can't tell whether an update is waiting.")
+    print("Run: uv run python setup/update.py  (turns it into a git checkout once, then updates)")
+    sys.exit(0)
 
 if not (REPO / ".git").exists():
     # ZIP install: make it a checkout of the repo. Tracked files are replaced by the latest version;
@@ -81,6 +98,8 @@ if "--check" in sys.argv:
         print(f"⬆️  {behind} update(s) waiting:")
         print(git("log", "--format=  • %s", f"HEAD..origin/{BRANCH}"))
         print("Run: uv run python setup/update.py")
+    elif APPLIED.exists() and APPLIED.read_text(encoding="utf-8").strip() != old:
+        print("⚠️  The last update didn't finish installing. Run: uv run python setup/update.py")
     else:
         print("✅ Up to date.")
     sys.exit(0)
@@ -94,19 +113,26 @@ if old:
         print("To throw the local changes away and update: git checkout -- . && uv run python setup/update.py")
         sys.exit(1)
     if not behind:
-        print("✅ Already up to date.")
-        if "--force" not in sys.argv:
-            sys.exit(0)
+        unfinished = APPLIED.exists() and APPLIED.read_text(encoding="utf-8").strip() != old
+        if unfinished:
+            print("Finishing the last update (it stopped before everything was installed).")
+        else:
+            print("✅ Already up to date.")
+            if "--force" not in sys.argv:
+                sys.exit(0)
     else:
         step(f"Getting {behind} update(s)")
         print(git("log", "--format=  • %s", f"HEAD..origin/{BRANCH}"))
         git("merge", "-q", "--ff-only", f"origin/{BRANCH}")
 
 new = git("rev-parse", "HEAD")
-changed = set(git("diff", "--name-only", old, new).splitlines()) if old and "--force" not in sys.argv else None
+# diff from what was last *applied* (not just checked out), so a half-finished update is completed
+base = (APPLIED.read_text(encoding="utf-8").strip() if APPLIED.exists() else old) if old else None
+if base and subprocess.run(["git", "cat-file", "-e", f"{base}^{{commit}}"], cwd=REPO, capture_output=True).returncode:
+    base = None  # unknown commit (history rewritten): re-apply everything
+changed = set(git("diff", "--name-only", base, new).splitlines()) if base and "--force" not in sys.argv else None
 touched = lambda *prefixes: changed is None or any(f.startswith(prefixes) for f in changed)  # noqa: E731
-_m = re.search(r"premiere-pro-mcp@([\d.]+)", git("show", f"{old}:setup/install-mac.sh")) if old else None
-old_mcp = _m.group(1) if _m else ""
+old_mcp = mcp_version(base) if base else ""
 
 if touched("pyproject.toml", "uv.lock"):
     step("Python packages")
@@ -122,6 +148,10 @@ if mcp_version() and mcp_version() != old_mcp:
     run("npm", "install", "-g", "--loglevel=error", f"premiere-pro-mcp@{mcp_version()}", quiet=True)
     run("premiere-pro-mcp", "--install-cep")
     restart_premiere = True
+sys.path.insert(0, str(REPO / "setup"))
+from patch_mcp import patch  # noqa: E402  (a reinstall drops the local fixes: re-apply every update)
+for problem in patch():
+    print("⚠️", problem)
 if (restart_premiere or touched("panel/")) and cep.exists():
     step("Premiere panel design")
     for f in ("index.html", "styles.css"):
@@ -139,6 +169,7 @@ for personal, template in (("brand.json", "brand.example.json"),):
 step("Health check")
 subprocess.run([sys.executable, str(REPO / "setup" / "doctor.py")], cwd=REPO)
 
+APPLIED.write_text(new, encoding="utf-8")
 print("\n✅ Updated.")
 print("→ Restart Claude Code so it loads the new skills.")
 if restart_premiere:

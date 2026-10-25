@@ -12,6 +12,7 @@ remotion/public/*
 # shared assets the components need (Minecraft icons/fonts, placeholders)
 !remotion/public/mc/
 !remotion/public/core/
+!remotion/public/lottie/
 # your own per-video graphics and their media stay local
 remotion/src/projects/*
 !remotion/src/projects/README.md
@@ -22,5 +23,5 @@ remotion/out/
 *.mp3
 *_analysis/
 test/
-# personal branding files
-brand/
+# personal branding files (top-level only)
+/brand/
