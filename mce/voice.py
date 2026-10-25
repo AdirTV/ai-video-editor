@@ -34,6 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import ff
 from .talkshort import VOICE_CHAIN, master_voice
 
 SR = 48000
@@ -43,13 +44,13 @@ HOP = 0.02  # analysis frame (s)
 def _read(src: str, stream: int, start: float = 0.0, dur: float | None = None) -> np.ndarray:
     cmd = ["ffmpeg", "-v", "error", "-ss", str(start), "-i", src] + (["-t", str(dur)] if dur else []) + \
           ["-map", f"0:a:{stream}", "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"]
-    return np.frombuffer(subprocess.run(cmd, capture_output=True, check=True).stdout, np.float32)
+    return np.frombuffer(ff.run(cmd, binary=True)[0], np.float32)
 
 
 def _speech_mask(n_frames: int, transcript: str | None, offset: float = 0.0) -> np.ndarray | None:
     if not transcript:
         return None
-    data = json.loads(Path(transcript).read_text())
+    data = json.loads(Path(transcript).read_text(encoding="utf-8"))
     segs = data["segments"] if isinstance(data, dict) else data
     mask = np.zeros(n_frames, bool)
     for s in segs:
@@ -277,7 +278,7 @@ def main() -> None:
         m = analyze(a.media, a.stream, a.transcript, a.start, a.dur)
         _report(m, a.media, a.stream)
         if a.json:
-            Path(a.json).write_text(json.dumps(m, indent=1))
+            Path(a.json).write_text(json.dumps(m, indent=1), encoding="utf-8")
     else:
         out = clean(a.media, a.stream, a.level, a.hum, a.declip, a.start, a.dur)
         before = analyze(a.media, a.stream, start=a.start or 0, dur=a.dur or 600)

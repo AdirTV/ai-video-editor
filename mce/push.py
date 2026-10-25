@@ -19,7 +19,10 @@ Before rebuilding, changes made by hand in Premiere to the old sequence ("replac
 the same name) are pulled into the spec (mce/pull.py); after importing, the new sequence is
 snapshotted so the next pull can tell hand edits apart. Clips get stable "id"s.
 
-  uv run python -m mce.push <spec.json> [--export out.mp4] [--no-pull] [--force]
+--export renders in Adobe Media Encoder when the export_via setting allows it (default: when installed —
+a render there can't take Premiere down), else inside Premiere; --export-direct forces the latter.
+
+  uv run python -m mce.push <spec.json> [--export out.mp4] [--export-direct] [--no-pull] [--force]
 """
 import argparse
 import copy
@@ -40,6 +43,7 @@ def _ok(res: str) -> bool:
 
 
 GROUP_STEPS = ("vo", "music", "sfx")
+CLIP_LIMIT = 200  # clips read back per track: the bridge now rejects more than 200 (push warns if a track is longer)
 
 
 def prepare(spec: dict, quiet: bool = False) -> tuple[dict, dict[str, str]]:
@@ -115,7 +119,8 @@ def assign_ids(spec: dict) -> bool:
     return changed
 
 
-def push(spec_path: str, export: str | None = None, keep_edits: bool = True, force: bool = False) -> None:
+def push(spec_path: str, export: str | None = None, keep_edits: bool = True, force: bool = False,
+         export_direct: bool = False) -> None:
     c = Client()
     try:
         def call(tool, args, label):
@@ -123,7 +128,7 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
             print(("✓ " if _ok(res) else "✗ ") + label + ("" if _ok(res) else f"  → {res[:200]}"))
             return res
 
-        spec = json.loads(Path(spec_path).read_text())
+        spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
         if spec.get("project"):
             # several projects can be open (other sessions); never import into whichever happens to be active
             def project_info() -> dict:
@@ -145,13 +150,13 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
             if r and r[1] and not force:
                 raise SystemExit("stopping: some of your Premiere changes couldn't be placed in the spec (above) — "
                                  "fix the spec, or push with --force to drop them")
-            spec = json.loads(Path(spec_path).read_text())
+            spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
         if assign_ids(spec):
-            Path(spec_path).write_text(json.dumps(spec, ensure_ascii=False, indent=1))
+            Path(spec_path).write_text(json.dumps(spec, ensure_ascii=False, indent=1), encoding="utf-8")
         spec, groups = prepare(spec)
         built = copy.deepcopy(spec)  # before headroom boosts swap files: what pull compares against
         xml = Path(spec_path).with_suffix(".xml")
-        xml.write_text(build(spec))
+        xml.write_text(build(spec), encoding="utf-8")
         replaces = spec.get("replaces")
         try:  # an older sequence with the same name would be the one activated and exported
             seqs = json.loads(c.call("list_sequences", {}))
@@ -178,11 +183,14 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
                 text = rep.read_text(encoding="utf-8-sig", errors="replace").strip()
                 print(f"⚠️ Premiere translation report ({rep.name}):\n   " + text.replace("\n", "\n   "))
         call("set_active_sequence", {"sequence_id": spec["name"]}, f"activate {spec['name']}")
-        seq = json.loads(c.call("get_active_sequence", {"track_type": "video", "clip_limit": 200}))
+        long = [f"{k}{i + 1}" for k in ("video", "audio") for i, tr in enumerate(spec.get(k, [])) if len(tr) > CLIP_LIMIT]
+        if long:
+            print(f"⚠️ tracks with more than {CLIP_LIMIT} clips ({', '.join(long)}): effects past clip {CLIP_LIMIT} are not applied")
+        seq = json.loads(c.call("get_active_sequence", {"track_type": "video", "clip_limit": CLIP_LIMIT}))
         seq = seq.get("data", seq)
         def node(ti, clip):  # by track + start: pieces of a razored clip share a name
             tracks = seq["videoTracks"]
-            cands = [cl for cl in (tracks[ti]["clips"] if ti < len(tracks) else []) if cl["name"] == clip.get("name")]
+            cands = [cl for cl in (tracks[ti]["clips"] if ti < len(tracks) else []) if cl.get("name") == clip.get("name")]
             best = min(cands, key=lambda cl: abs(cl["start"] - clip["start"]), default=None)
             return best["nodeId"] if best and abs(best["start"] - clip["start"]) < 0.05 else None
 
@@ -192,19 +200,19 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
                 if not nid:
                     continue
                 for fx in clip.get("effects", []):
-                    call("apply_effect", {"node_id": nid, "effect_name": fx["name"]}, f"{fx['name']} → {clip['name']}")
+                    call("apply_effect", {"node_id": nid, "effect_name": fx["name"]}, f"{fx['name']} → {clip.get('name', '?')}")
                     for prop, val in fx.get("props", {}).items():
                         call("set_effect_property", {"node_id": nid, "effect_name": fx["name"],
                                                      "property_name": prop, "value": val}, f"  {prop}={val}")
                 if clip.get("pop"):
                     call("add_transition_to_clip", {"node_id": nid, "transition_name": "Pop Motion",
                                                     "position": clip["pop"], "duration_seconds": 0.25},
-                         f"Pop Motion ({clip['pop']}) → {clip['name']}")
+                         f"Pop Motion ({clip['pop']}) → {clip.get('name', '?')}")
         # Pro tip: a Hard Limiter at -2 dB maximum amplitude so nothing peaks. Premiere's
         # API can't add effects to the Mix track, so it goes on every audio clip; QA then
         # checks the true peak of the whole render.
         if spec.get("limit_db") is not None:
-            aseq = json.loads(c.call("get_active_sequence", {"track_type": "audio", "clip_limit": 200}))
+            aseq = json.loads(c.call("get_active_sequence", {"track_type": "audio", "clip_limit": CLIP_LIMIT}))
             aseq = aseq.get("data", aseq)
             for t_ in aseq.get("audioTracks", []):
                 for cl in t_["clips"]:
@@ -230,7 +238,7 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
             from .pull import make_snapshot, read_live, snapshot_path
             snap = snapshot_path(spec_path, spec["name"])
             parsed = read_live(c, spec["name"], snap.with_suffix(".pushed.xml"))
-            snap.write_text(json.dumps(make_snapshot(built, parsed, groups, spec["name"]), ensure_ascii=False))
+            snap.write_text(json.dumps(make_snapshot(built, parsed, groups, spec["name"]), ensure_ascii=False), encoding="utf-8")
             if replaces:
                 old = snapshot_path(spec_path, replaces)
                 for f in (old, old.with_suffix(".pushed.xml"), old.with_suffix(".live.xml")):
@@ -246,7 +254,7 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
             active = active.get("data", active).get("name")
             if active != spec["name"]:
                 raise RuntimeError(f"refusing to export: active sequence is {active!r}")
-            call("export_sequence", {"output_path": export, "overwrite": True}, f"export {export}")
+            render(c, call, spec, export, direct=export_direct)
             # Self-review before anyone else sees it: objective checks + full contact sheets.
             from .qa import check_render, check_spec, sheets
             print("QA:\n" + "\n".join(check_render(export) + check_spec(spec)))
@@ -256,11 +264,46 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
         c.close()
 
 
+def seq_end(spec: dict) -> float:
+    """Where the sequence ends: its last picture frame (audio tails are trimmed to it)."""
+    return max((c["start"] + (c["out"] - c["in"]) / (c.get("speed") or 1)
+                for tr in spec.get("video", []) for c in tr), default=0.0)
+
+
+def render(c, call, spec: dict, export: str, direct: bool = False) -> None:
+    """Media Encoder when allowed and installed (falling back to Premiere if the hand-over fails), else Premiere."""
+    from . import ame
+    preset = None if direct else (ame.use() and ame.preset())
+    if not direct and not preset and ame.EXPORT_VIA == "ame":
+        print("⚠️ export_via is \"ame\" but Adobe Media Encoder isn't installed: rendering inside Premiere")
+    if preset:
+        out = Path(export)
+        out.unlink(missing_ok=True)  # AME renames instead of overwriting ("x_1.mp4")
+        # AME renders in to out: stale marks would cut the render short
+        call("clear_sequence_in_out", {}, "clear in/out marks")
+        since = ame.log_sizes()
+        res = c.call("add_to_render_queue", {"output_path": str(out), "preset_path": preset, "start_batch": True})
+        try:
+            d = json.loads(res)
+            d = d.get("data", d)
+        except (json.JSONDecodeError, AttributeError):
+            d = {}
+        # AME only takes the job: "accepted" with a job id is all Premiere can confirm (wait() checks the rest)
+        if isinstance(d, dict) and d.get("accepted") and d.get("jobId"):
+            print(f"✓ Media Encoder: rendering {out.name} (Premiere stays free)")
+            ame.wait(out, seq_end(spec), since, fps=float(spec.get("fps", 30)))
+            print(f"✓ export {export}")
+            return
+        print(f"⚠️ Media Encoder hand-over failed, rendering inside Premiere instead: {str(res)[:300]}")
+    call("export_sequence", {"output_path": export, "overwrite": True}, f"export {export}")
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("spec")
     p.add_argument("--export")
     p.add_argument("--no-pull", action="store_true", help="don't carry hand edits from Premiere into the spec")
     p.add_argument("--force", action="store_true", help="push even if some hand edits couldn't be placed")
+    p.add_argument("--export-direct", action="store_true", help="render inside Premiere, not in Media Encoder")
     a = p.parse_args()
-    push(a.spec, a.export, keep_edits=not a.no_pull, force=a.force)
+    push(a.spec, a.export, keep_edits=not a.no_pull, force=a.force, export_direct=a.export_direct)

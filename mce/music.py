@@ -12,7 +12,9 @@ fit     → the source offset to start the song at. Always on a bar line (never
           break covers the whole video.
 """
 import argparse
+import hashlib
 import json
+from pathlib import Path
 
 import numpy as np
 
@@ -20,6 +22,8 @@ from .i18n import t
 
 SR = 22050
 HOP = 512
+CACHE = Path.home() / ".mce" / "cache" / "music"
+ANALYSIS_VERSION = 1  # bump when analyze() changes, so cached results are recomputed
 
 
 def _bars(beat_times: np.ndarray, strength: np.ndarray) -> np.ndarray:
@@ -31,6 +35,22 @@ def _bars(beat_times: np.ndarray, strength: np.ndarray) -> np.ndarray:
 
 
 def analyze(path: str) -> dict:
+    """Cached per song file (same path, size and date): push/pull re-plan the music on every build."""
+    st = Path(path).stat()
+    key = hashlib.md5(f"{Path(path).resolve()}|{st.st_size}|{st.st_mtime}|{ANALYSIS_VERSION}".encode()).hexdigest()
+    hit = CACHE / f"{key}.json"
+    if hit.exists():
+        try:
+            return json.loads(hit.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pass
+    info = _analyze(path)
+    CACHE.mkdir(parents=True, exist_ok=True)
+    hit.write_text(json.dumps(info), encoding="utf-8")
+    return info
+
+
+def _analyze(path: str) -> dict:
     import librosa
 
     y, sr = librosa.load(path, sr=SR, mono=True)

@@ -59,7 +59,7 @@ def main() -> None:
         print(f"{r['i']:4d}  {fmt(r['start'])} – {fmt(r['end'])}  ({r['dur']:.2f}s)  [{r['start']:.3f}–{r['end']:.3f}]")
     print(f"{len(rows)} shots")
     if a.json:
-        Path(a.json).write_text(json.dumps(rows, indent=1))
+        Path(a.json).write_text(json.dumps(rows, indent=1), encoding="utf-8")
 
 
 if __name__ == "__main__":

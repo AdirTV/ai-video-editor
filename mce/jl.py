@@ -57,7 +57,7 @@ def auto(plan: dict, tl: dict) -> list[str]:
 
 if __name__ == "__main__":
     plan_path, tl_path = sys.argv[1], sys.argv[2]
-    plan = json.loads(Path(plan_path).read_text())
-    rep = auto(plan, json.loads(Path(tl_path).read_text()))
-    Path(plan_path).write_text(json.dumps(plan, ensure_ascii=False, indent=1))
+    plan = json.loads(Path(plan_path).read_text(encoding="utf-8"))
+    rep = auto(plan, json.loads(Path(tl_path).read_text(encoding="utf-8")))
+    Path(plan_path).write_text(json.dumps(plan, ensure_ascii=False, indent=1), encoding="utf-8")
     print("\n".join(rep) or "hard cuts everywhere (nothing called for J/L)")

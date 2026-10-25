@@ -19,7 +19,7 @@ def _log(msg: str) -> None:
 
 
 def _save(path: Path, data) -> None:
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=1))
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def analyze(args) -> None:
@@ -64,26 +64,26 @@ def analyze(args) -> None:
     _log(f"audio: {len(speech)} speech segments, {len(excite)} excited, {len(game)} game spikes")
     sounds_path = out / "sounds.json"
     if sounds_path.exists():
-        sounds = json.loads(sounds_path.read_text())
+        sounds = json.loads(sounds_path.read_text(encoding="utf-8"))
     else:
         from . import events
         sounds = events.detect(str(mic_wav), groups=["laugh", "scream", "gasp"])
         if game_i is not None or game_from_stems:
             sounds += events.detect(str(out / "audio" / "game.wav"), groups=["explosion"])
         _save(sounds_path, sounds)
-    _log(f"sound events: " + ", ".join(f"{k} {sum(e['kind'] == k for e in sounds)}"
+    _log("sound events: " + ", ".join(f"{k} {sum(e['kind'] == k for e in sounds)}"
                                         for k in ("laugh", "scream", "gasp", "explosion")))
 
     seg_path = out / "transcript.json"
     if seg_path.exists() and not args.retranscribe:
-        segments = json.loads(seg_path.read_text())
+        segments = json.loads(seg_path.read_text(encoding="utf-8"))
         _log("transcript: cached")
     else:
         from . import transcribe as tr
         lang = args.language
         _log(f"transcribing ({lang})…")
         vocab = Path(__file__).parent.parent / "vocab.txt"
-        extra = vocab.read_text().strip().replace("\n", ", ") if vocab.exists() else ""
+        extra = vocab.read_text(encoding="utf-8").strip().replace("\n", ", ") if vocab.exists() else ""
         base = tr.PROMPTS.get((args.profile, lang), "") if lang != "auto" else ""
         prompt = ", ".join(x for x in (base, extra) if x) or None
         segments = tr.transcribe(str(mic_wav), prompt=prompt, language=lang)
@@ -112,10 +112,10 @@ def analyze(args) -> None:
     tl.update({"source": src, "layout": layout, "fps": info.fps_float,
                "audio": {"mic": mic_i, "game": game_i}, "stems": st, "width": info.width, "height": info.height})
     _save(out / "timeline.json", tl)
-    (out / "timeline.md").write_text(timeline.to_markdown(tl, segments, samples))
+    (out / "timeline.md").write_text(timeline.to_markdown(tl, segments, samples), encoding="utf-8")
     (out / "transcript.md").write_text("\n".join(
         f"[{sheets.fmt(s['start'])}]" + (f" {s['speaker']}:" if "speaker" in s else "") + f" {s['text']}"
-        for s in segments) + "\n")
+        for s in segments) + "\n", encoding="utf-8")
 
     sheets.overview(out / "thumbs", info.duration, out / "sheets")
     for h in sorted(tl["highlights"], key=lambda h: -h["score"])[:20]:
@@ -125,18 +125,18 @@ def analyze(args) -> None:
 
 def moment(args) -> None:
     out = Path(args.dir)
-    tl = json.loads((out / "timeline.json").read_text())
+    tl = json.loads((out / "timeline.json").read_text(encoding="utf-8"))
     for t in args.seconds:
         print(sheets.moment(out / "thumbs", float(t), tl["duration"], out / "sheets"))
 
 
 def export(args) -> None:
     plan_path = Path(args.plan)
-    plan = json.loads(plan_path.read_text())
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
     info = probe(plan["source"])
     xml = fcpxml.build(plan, info)
     dest = Path(args.output or plan_path.with_suffix(".xml"))
-    dest.write_text(xml)
+    dest.write_text(xml, encoding="utf-8")
     print(dest)
 
 

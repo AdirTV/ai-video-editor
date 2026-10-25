@@ -10,8 +10,10 @@ drops by the same amount: same sound, no dialog.
 """
 import hashlib
 import math
-import subprocess
+import os
 from pathlib import Path
+
+from . import ff
 
 MAX_CLIP_DB = 6.0   # Premiere clamps XML audio levels above this
 TARGET_DB = 5.0     # after boosting, the loudest point of a clip sits here (1 dB margin)
@@ -28,10 +30,10 @@ def _boosted(path: str, stream: int, boost: int) -> str:
     tag = hashlib.md5(f"{Path(path).resolve()}|{Path(path).stat().st_mtime}".encode()).hexdigest()[:10]
     out = CACHE / f"{Path(path).stem[:40]}_{tag}_a{stream}_+{boost}dB.wav"
     if not out.exists():
-        tmp = out.with_suffix(".tmp.wav")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-map", f"0:a:{stream - 1}", "-vn",
-                        "-af", f"volume={boost}dB", "-c:a", "pcm_f32le", str(tmp)], check=True)
-        tmp.rename(out)
+        tmp = out.with_suffix(f".{os.getpid()}.tmp.wav")  # per process: parallel runs don't clash
+        ff.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-map", f"0:a:{stream - 1}", "-vn",
+                "-af", f"volume={boost}dB", "-c:a", "pcm_f32le", str(tmp)])
+        os.replace(tmp, out)  # rename() fails on Windows when out already exists
     return str(out)
 
 

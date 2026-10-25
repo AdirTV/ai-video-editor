@@ -29,7 +29,7 @@ MODELS["base"] = MODELS["base-plus"]
 def _info(src: str) -> tuple[int, int, str]:
     s = json.loads(subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
                                    "stream=width,height,avg_frame_rate:stream_side_data=rotation", "-of", "json", src],
-                                  capture_output=True, text=True, check=True).stdout)["streams"][0]
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout)["streams"][0]
     w, h = s["width"], s["height"]
     rot = next((abs(int(d.get("rotation", 0))) for d in s.get("side_data_list", [])), 0)
     return (h, w, s["avg_frame_rate"]) if rot in (90, 270) else (w, h, s["avg_frame_rate"])

@@ -28,7 +28,7 @@ def _at(spec: dict, t: float, kind: str) -> list[str]:
 
 
 def read_notes(spec_path: str) -> list[dict]:
-    spec = json.loads(Path(spec_path).read_text())
+    spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     c = Client()
     try:
         c.call("set_active_sequence", {"sequence_id": spec["name"]})

@@ -3,25 +3,26 @@
   uv run python -m mce.qa <render.mp4> [--spec spec.json] [--sheets DIR]
 
 Checks: black frames, frozen picture, loudness for YouTube (-14 LUFS, true peak
-<= -1 dBTP), dead air, and spec problems (V1 gaps, flash-short clips/captions,
+<= -2 dBTP), dead air, and spec problems (V1 gaps, flash-short clips/captions,
 overlapping overlays). Writes dense contact sheets so the whole render can be
 looked at, not just a few frames.
 """
 import argparse
 import json
 import re
-import subprocess
 from pathlib import Path
 
 import cv2
 import numpy as np
+from . import ff
+from .ff import snap_fps
 from .i18n import t
 
 TARGET_LUFS, MAX_TP = -14.0, -2.0  # YouTube target; peaks kept under -2 dB (Hard Limiter tip)
 
 
 def _ff(args: list[str]) -> str:
-    return subprocess.run(["ffmpeg", "-hide_banner", "-nostats", *args], capture_output=True, text=True).stderr
+    return ff.run(["ffmpeg", "-hide_banner", "-nostats", *args])[1]
 
 
 def _ranges(log: str, start_key: str, end_key: str) -> list[tuple[float, float]]:
@@ -42,6 +43,14 @@ def check_render(path: str) -> list[str]:
                    "black_start", "black_end")
     if tail and not black:
         issues.append(t("black_tail", d=tail[-1][1] - tail[-1][0]))
+    # an empty panel for a frame or two (a graphic ending a frame early above a split layout): black in
+    # the top or bottom third only, which the whole-frame check above can't see
+    for half, crop in (("top", "crop=iw:ih*0.35:0:0"), ("bottom", "crop=iw:ih*0.35:0:ih*0.65")):
+        for s, e in _ranges(_ff(["-i", path, "-vf", f"{crop},blackdetect=d=0.01:pix_th=0.08:pic_th=0.85", "-an", "-f", "null", "-"]),
+                            "black_start", "black_end"):
+            # only flashes: a long dark stretch is content (a black shirt, a night scene)
+            if e - s <= 0.15 and not any(a <= s and e <= b for a, b in black):
+                issues.append(t("black_half", half=half, s=s, e=e))
     freeze = _ranges(_ff(["-i", path, "-vf", "freezedetect=n=0.002:d=0.6", "-an", "-f", "null", "-"]),
                      r"lavfi.freezedetect.freeze_start", r"lavfi.freezedetect.freeze_end")
     for s, e in freeze:
@@ -75,8 +84,14 @@ def check_spec(spec: dict) -> list[str]:
         if c["start"] - end > 0.02:
             issues.append(t("v1_gap", a=end, b=c["start"]))
         end = max(end, c["start"] + (c["out"] - c["in"]) / (c.get("speed") or 1))
+    # an overlay running past the base picture leaves the rest of the frame black at the end
+    for t_i, track in enumerate(spec.get("video", [])[1:], 2):
+        for c in track:
+            ce = c["start"] + (c["out"] - c["in"]) / (c.get("speed") or 1)
+            if ce > end + 0.02:
+                issues.append(t("past_v1", name=c.get("name"), t=t_i, e=ce, v1=end))
     # tiny gaps between back-to-back clips on ANY video track (1–3 frames of black, or of the track below)
-    fps = int(spec.get("fps", 60))
+    fps = float(snap_fps(spec.get("fps", 60)))
     fr = lambda x: round(x * fps)
     for t_i, track in enumerate(spec.get("video", []), 1):
         cl = sorted(track, key=lambda c: c["start"])
@@ -102,8 +117,8 @@ def sheets(path: str, out_dir: Path, every: float = 0.25) -> list[Path]:
     """Contact sheets of the whole render: 4x4 frames each, timestamped."""
     out_dir.mkdir(parents=True, exist_ok=True)
     w, h = 216, 384
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-vf", f"fps={1 / every},scale={w}:{h}",
-                          "-f", "rawvideo", "-pix_fmt", "bgr24", "-"], capture_output=True).stdout
+    raw, _ = ff.run(["ffmpeg", "-v", "error", "-i", path, "-vf", f"fps={1 / every},scale={w}:{h}",
+                     "-f", "rawvideo", "-pix_fmt", "bgr24", "-"], binary=True)
     frames = np.frombuffer(raw, np.uint8).reshape(-1, h, w, 3)
     paths = []
     for s in range(0, len(frames), 16):
@@ -127,7 +142,7 @@ def main() -> None:
     a = ap.parse_args()
     issues = check_render(a.render)
     if a.spec:
-        issues += check_spec(json.loads(Path(a.spec).read_text()))
+        issues += check_spec(json.loads(Path(a.spec).read_text(encoding="utf-8")))
     print("\n".join(issues) or t("no_issues"))
     if a.sheets:
         for p in sheets(a.render, Path(a.sheets)):

@@ -9,7 +9,6 @@ laugh from a shout from a loud mining loop.
 """
 import argparse
 import json
-import wave
 
 import numpy as np
 
@@ -28,10 +27,9 @@ THRESH = {"laugh": 0.25, "scream": 0.3, "gasp": 0.55, "explosion": 0.3, "music":
 
 
 def _load(path: str) -> np.ndarray:
-    import subprocess
+    from . import ff
 
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", str(SR), "-f", "s16le", "-"],
-                         capture_output=True, check=True).stdout
+    raw, _ = ff.run(["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", str(SR), "-f", "s16le", "-"], binary=True)
     return np.frombuffer(raw, np.int16).astype(np.float32) / 32768
 
 

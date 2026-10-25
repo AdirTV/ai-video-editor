@@ -15,14 +15,13 @@ Spec (JSON), all times in seconds:
 }
 Audio clips: "fade_in"/"fade_out" seconds (relative to gain_db) for crossfades at jump cuts.
 Scale is percent, x/y are the clip's center in sequence pixels (default: frame center).
+Video clips may set "rotation" (degrees clockwise, static).
 Stills (png/jpg) can use any in/out.
 """
-import json
-import subprocess
 from pathlib import Path
-from urllib.parse import quote
 from xml.sax.saxutils import escape
 
+from .ff import display_size, pathurl, probe_json, rotation, snap_fps, stream_fps
 from .fcpxml import MARKER_LABELS, _crop, _gain, _motion, _speed
 from .headroom import MAX_CLIP_DB, fit_gain
 
@@ -31,31 +30,64 @@ STILL_DUR = 3600.0
 
 
 def _probe(path: str) -> dict:
-    data = json.loads(subprocess.run(
-        ["ffprobe", "-v", "error", "-print_format", "json", "-show_streams", "-show_format", path],
-        check=True, capture_output=True, text=True).stdout)
+    data = probe_json(path)
     still = Path(path).suffix.lower() in STILL_EXT
     v = next((s for s in data["streams"] if s["codec_type"] == "video" and not
               (s.get("disposition", {}).get("attached_pic"))), None)
+    fps = stream_fps(v) if v and not still else None
     return {
         "still": still,
-        "width": int(v["width"]) if v else None,
-        "height": int(v["height"]) if v else None,
+        # as shown: a phone's portrait clip is 1080x1920 here, and "rot" turns it upright in Premiere
+        "width": display_size(v)[0] if v else None,
+        "height": display_size(v)[1] if v else None,
+        "rot": rotation(v) if v and not still else 0,
         "duration": STILL_DUR if still else float(data["format"]["duration"]),
-        "fps": (lambda n, d: n / d)(*map(int, v["avg_frame_rate"].split("/"))) if v and not still else None,
+        "fps": float(fps) if fps else None,
+        # overlay graphics (Remotion ProRes 4444): Premiere fails to read their very last frame
+        "alpha": bool(v and not still and "a" in v.get("pix_fmt", "").replace("gray", "")),
         "audio": [{"channels": s.get("channels", 2), "rate": int(s.get("sample_rate", 48000))}
                   for s in data["streams"] if s["codec_type"] == "audio"],
     }
 
 
+def _stored_crop(crop: list[float], rot: int) -> list[float]:
+    """Spec crop [left, right, top, bottom] is of the picture as shown; Premiere crops the stored frames before
+    turning them, so a phone clip's sides move round: shown left is stored bottom when turned 90° clockwise."""
+    left, right, top, bottom = (list(crop) + [0, 0, 0, 0])[:4]
+    return {90: [top, bottom, right, left], 180: [right, left, bottom, top],
+            270: [bottom, top, left, right]}.get(rot, [left, right, top, bottom])
+
+
+def trim_audio_tail(spec: dict) -> list[str]:
+    """No sound may run past the last picture frame: an SFX or music tail longer than the video makes the
+    sequence longer, and the render ends on black. Such clips are cut at the picture's end with a short fade."""
+    ends = [c["start"] + (c["out"] - c["in"]) / (c.get("speed") or 1) for tr in spec.get("video", []) for c in tr]
+    if not ends:
+        return []
+    vend, notes = max(ends), []
+    for tr in spec.get("audio", []):
+        for c in tr:
+            sp = c.get("speed") or 1
+            over = c["start"] + (c["out"] - c["in"]) / sp - vend
+            if over > 1e-3:
+                c["out"] = round(c["out"] - over * sp, 3)
+                c["fade_out"] = min(max(c.get("fade_out", 0), 0.08), max(0.0, (c["out"] - c["in"]) / sp))
+                notes.append(f"{c.get('name', c['file'])} ran {over:.2f}s past the picture — trimmed")
+    for tr in spec.get("audio", []):
+        tr[:] = [c for c in tr if c["out"] - c["in"] > 0.01]
+    return notes
+
+
 def build(spec: dict) -> str:
+    for line in trim_audio_tail(spec):
+        print("Tail:", line)
     # Premiere clamps XML audio levels at +6 dB (and shows a "Translation Report"): quiet sources get a
     # pre-boosted copy instead of extra clip gain
     for line in fit_gain(spec):
         print("Headroom:", line)
-    fps = int(spec.get("fps", 60))
+    fps = float(snap_fps(spec.get("fps", 60)))  # 29.97 → NTSC timebase 30, frames counted at 29.97
     W, H = spec.get("width", 1080), spec.get("height", 1920)
-    rate = f"<rate><timebase>{fps}</timebase><ntsc>FALSE</ntsc></rate>"
+    rate = f"<rate><timebase>{round(fps)}</timebase><ntsc>{'TRUE' if round(fps) != fps else 'FALSE'}</ntsc></rate>"
     fr = lambda s: round(s * fps)
 
     def frate(f: dict) -> tuple[float, str]:
@@ -78,7 +110,7 @@ def build(spec: dict) -> str:
         audio = "".join(f"<audio><samplecharacteristics><depth>16</depth><samplerate>{a['rate']}</samplerate>"
                         f"</samplecharacteristics><channelcount>{a['channels']}</channelcount></audio>"
                         for a in f["audio"])
-        return (f'<file id="{fid}"><name>{escape(p.name)}</name><pathurl>file://{quote(str(p))}</pathurl>'
+        return (f'<file id="{fid}"><name>{escape(p.name)}</name><pathurl>{pathurl(p)}</pathurl>'
                 f"{frt}<duration>{round(f['duration'] * r)}</duration><media>{video}{audio}</media></file>")
 
     n = 0
@@ -95,10 +127,16 @@ def build(spec: dict) -> str:
         cf, crate = frate(f)  # clip in/out/keyframes count source frames
         c_in = round(c["in"] * cf / speed)
         c_dur = round(dur * cf / fps)
+        last = round(f["duration"] * cf)
+        if kind == "video" and f.get("alpha") and c_in + c_dur >= last > c_in + 1:
+            # "Error retrieving frame N … substituting frame N-1" on every alpha .mov that plays to its end:
+            # stop one source frame early (the graphic's faded-out tail, invisible)
+            c_dur = last - 1 - c_in
+            dur = max(1, round(c_dur * fps / cf))
         filters = ""
         if kind == "video":
             if c.get("crop"):
-                filters += _crop(*c["crop"])
+                filters += _crop(*_stored_crop(c["crop"], f.get("rot", 0)))
             # xmeml center = offset from frame center / source size (measured
             # by round-tripping Premiere's own XML export).
             nx = lambda x: (x - W / 2) / f["width"]
@@ -108,7 +146,8 @@ def build(spec: dict) -> str:
             keys = [(c_in + round(k["t"] * cf), k.get("scale", c.get("scale", 100)),
                      nx(k.get("x", c.get("x", W / 2))), ny(k.get("y", c.get("y", H / 2))))
                     for k in c.get("keys", [])]
-            filters += _motion(c.get("scale", 100), nx(c.get("x", W / 2)), ny(c.get("y", H / 2)), keys)
+            filters += _motion(c.get("scale", 100), nx(c.get("x", W / 2)), ny(c.get("y", H / 2)), keys,
+                               c.get("rotation", 0) + f.get("rot", 0))
             if speed != 1:
                 filters += _speed(speed * 100)
         else:

@@ -20,11 +20,11 @@ import argparse
 import functools
 import hashlib
 import json
-import subprocess
 from pathlib import Path
 
 import numpy as np
 
+from . import ff
 from .config import SFX_LIB as LIB
 AUDIO_EXT = {".wav", ".mp3", ".m4a", ".aif", ".aiff", ".ogg", ".flac"}
 
@@ -76,8 +76,8 @@ def _category(path: Path, lib: Path) -> str:
 
 
 def _analyze(path: Path) -> dict:
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-t", "20", "-i", str(path), "-ac", "1", "-ar", "16000",
-                          "-f", "s16le", "-"], capture_output=True, check=True).stdout
+    raw, _ = ff.run(["ffmpeg", "-v", "error", "-t", "20", "-i", path, "-ac", "1", "-ar", "16000",
+                     "-f", "s16le", "-"], binary=True)
     x = np.frombuffer(raw, np.int16).astype(np.float32) / 32768
     hop = 160  # 10 ms
     n = max(1, len(x) // hop)
@@ -99,8 +99,7 @@ SILENT_PEAK = -40.0
 
 @functools.lru_cache(maxsize=None)
 def _sample_peak(path: str) -> float:
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-t", "20", "-i", path, "-ar", "48000", "-f", "f32le", "-"],
-                         capture_output=True, check=True).stdout
+    raw, _ = ff.run(["ffmpeg", "-v", "error", "-t", "20", "-i", path, "-ar", "48000", "-f", "f32le", "-"], binary=True)
     x = np.abs(np.frombuffer(raw, np.float32))
     return float(20 * np.log10(x.max() + 1e-9)) if len(x) else -90.0
 
@@ -109,21 +108,47 @@ def _item(args: tuple[str, str]) -> dict | None:
     p, lib = Path(args[0]), Path(args[1])
     try:
         info = _analyze(p)
-    except subprocess.CalledProcessError:
+    except ff.FFError:  # unreadable/corrupt file in the pack
         return None
     rel = p.relative_to(lib)
     return {"path": str(p), "kind": _category(p, lib), "tags": " ".join(rel.parts).lower(), **info}
 
 
-def index(lib: Path = LIB) -> dict:
+def _scan(lib: Path) -> dict[str, list]:
+    """Every sound in the library → [size, mtime]: cheap to compute, changes when a file is added/replaced."""
+    out = {}
+    for p in sorted(lib.rglob("*")):
+        if p.suffix.lower() in AUDIO_EXT and not p.name.startswith(".") and "_generated" not in p.parts:
+            st = p.stat()
+            out[str(p)] = [st.st_size, round(st.st_mtime)]
+    return out
+
+
+def _signature(files: dict[str, list]) -> str:
+    return hashlib.md5(json.dumps(files, sort_keys=True).encode()).hexdigest()
+
+
+def index(lib: Path = LIB, files: dict[str, list] | None = None) -> dict:
+    """Analyze the library. Sounds already indexed with the same size/date are reused, so after adding a
+    pack only the new files are analyzed."""
     from concurrent.futures import ProcessPoolExecutor
 
-    paths = [str(p) for p in sorted(lib.rglob("*"))
-             if p.suffix.lower() in AUDIO_EXT and not p.name.startswith(".") and "_generated" not in p.parts]
+    files = files if files is not None else _scan(lib)
+    idx_path = lib / "sfx_index.json"
+    old = {}
+    if idx_path.exists():
+        old = {it["path"]: it for it in json.loads(idx_path.read_text(encoding="utf-8")).get("items", [])
+               if it.get("stat") and it["path"] in files and it["stat"] == files[it["path"]]}
+    todo = [p for p in files if p not in old]
     with ProcessPoolExecutor() as ex:
-        items = [it for it in ex.map(_item, [(p, str(lib)) for p in paths], chunksize=32) if it]
-    idx = {"lib": str(lib), "items": items}
-    (lib / "sfx_index.json").write_text(json.dumps(idx, ensure_ascii=False, indent=1))
+        new = [it for it in ex.map(_item, [(p, str(lib)) for p in todo], chunksize=32) if it]
+    for it in new:
+        it["stat"] = files[it["path"]]
+    items = sorted([*old.values(), *new], key=lambda it: it["path"])
+    idx = {"lib": str(lib), "signature": _signature(files), "items": items}
+    idx_path.write_text(json.dumps(idx, ensure_ascii=False, indent=1), encoding="utf-8")
+    if old:
+        print(f"reused {len(old)}, analyzed {len(todo)} new/changed")
     counts: dict[str, int] = {}
     for it in items:
         counts[it["kind"]] = counts.get(it["kind"], 0) + 1
@@ -153,7 +178,7 @@ def starter_kit(lib: Path = LIB, per_kind: int = 8, kinds: list[str] | None = No
     """Copy a small, varied, sensibly-named set per kind into LIB/<kind>/ for auditioning."""
     import shutil
 
-    idx = json.loads((lib / "sfx_index.json").read_text())
+    idx = load_index(lib)
     for kind, (words, (lo, hi)) in STARTER.items():
         if kinds and kind not in kinds:
             continue
@@ -185,7 +210,7 @@ def starter_kit(lib: Path = LIB, per_kind: int = 8, kinds: list[str] | None = No
 
 def search(words: str, lib: Path = LIB, limit: int = 15) -> list[dict]:
     """Find sounds whose path contains all the given words (e.g. "zombie hurt")."""
-    idx = json.loads((lib / "sfx_index.json").read_text())
+    idx = load_index(lib)
     ws = words.lower().split()
     return [it for it in idx["items"] if all(w in it["tags"] for w in ws)][:limit]
 
@@ -204,8 +229,8 @@ def typing_track(duration: float, lib: Path = LIB, seed: int = 0, rate: float = 
     sr = 48000
     samples = []
     for k in keys:
-        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(k), "-ac", "1", "-ar", str(sr), "-t", "0.4",
-                              "-f", "s16le", "-"], capture_output=True, check=True).stdout
+        raw, _ = ff.run(["ffmpeg", "-v", "error", "-i", k, "-ac", "1", "-ar", str(sr), "-t", "0.4",
+                         "-f", "s16le", "-"], binary=True)
         x = np.frombuffer(raw, np.int16).astype(np.float32) / 32768
         if len(x):
             samples.append(x / (np.abs(x).max() + 1e-9))
@@ -265,9 +290,20 @@ TRANSITION_SFX = {
 }
 
 
-def plan(spec: dict, lib: Path = LIB) -> tuple[dict, list[str]]:
+def load_index(lib: Path = LIB) -> dict:
+    """The library index, refreshed first when sounds were added, removed or replaced since it was built."""
     idx_path = lib / "sfx_index.json"
-    idx = json.loads(idx_path.read_text()) if idx_path.exists() else index(lib)
+    files = _scan(lib)
+    if idx_path.exists():
+        idx = json.loads(idx_path.read_text(encoding="utf-8"))
+        if idx.get("signature") == _signature(files):
+            return idx
+        print("SFX library changed — updating the index")
+    return index(lib, files)
+
+
+def plan(spec: dict, lib: Path = LIB) -> tuple[dict, list[str]]:
+    idx = load_index(lib)
     pick = _Picker(idx["items"])
     hits: list[tuple] = []  # (t, kind, gain offset, align, forced file)
 
@@ -279,7 +315,7 @@ def plan(spec: dict, lib: Path = LIB) -> tuple[dict, list[str]]:
             if c.get("pop") in ("start", "both"):
                 hits.append((c["start"], "pop", 0, "start", None))
             if c.get("pop") in ("end", "both"):
-                hits.append((c["start"] + c["out"] - c["in"] - 0.15, "pop", -6, "start", None))
+                hits.append((c["start"] + (c["out"] - c["in"]) / (c.get("speed") or 1) - 0.15, "pop", -6, "start", None))
             if c.get("text"):      # text appearing → ASMR typing for as long as it types on
                 dur = c.get("text_dur") or min((c["out"] - c["in"]) * 0.8, 1.2)
                 hits.append((c["start"], "typing", 0, "start", f"__typing__:{dur:.2f}"))
@@ -326,6 +362,8 @@ def plan(spec: dict, lib: Path = LIB) -> tuple[dict, list[str]]:
     spec["audio"] += [lane for lane in tracks if lane]
     for k in sorted(missing):
         report.append(f"!! no '{k}' sounds in the library — add some to {lib / k}")
+    if not hits:
+        report.append("nothing to sound: no transitions, pops, text, emphasis or \"sfx\" cues in the spec")
     return spec, report
 
 
@@ -350,8 +388,8 @@ def main() -> None:
         for it in search(" ".join(a.words)):
             print(f"{it['kind']:9s} {it['duration']:5.2f}s  {Path(it['path']).relative_to(LIB)}")
     else:
-        spec, report = plan(json.loads(Path(a.spec).read_text()), Path(a.lib))
-        Path(a.spec).write_text(json.dumps(spec, ensure_ascii=False, indent=1))
+        spec, report = plan(json.loads(Path(a.spec).read_text(encoding="utf-8")), Path(a.lib))
+        Path(a.spec).write_text(json.dumps(spec, ensure_ascii=False, indent=1), encoding="utf-8")
         print("\n".join(report))
 
 

@@ -19,6 +19,9 @@ Config (JSON):
                  # at = shot id from the printed shot list ("06a", "06a+0.9"), timeline seconds, or
                  # "word": "phrase" (first time it's said); fills its shot, slowed (>=0.7x) if too short
   "max_gap": 0.3, "fillers": ["um", "uh"], "punch": [100, 120, 140],   # % on top of the base framing
+  "allow_flaws": false,                      # takes are checked first (mce.takecheck): a stall / drawn-out word
+                                             # mid-sentence stops the build — choose a clean take instead
+  "jcut": 0.1, "jcut_picture": 0.2,          # next sentence's sound starts early; its picture follows
   "captions": {"look": "karaoke" | "stream", "font": "carlito", "size": 84, "max_words": 6,
                "fix": {"gta": "GTA"}, "big": ["pyramids"], "hl": {"GTA": "#FFD84D"}, "mov": "graphics/caps v1.mov"},
                  # karaoke (clip-channel look): white 2-line phrases, upcoming words dimmed, on the seam
@@ -29,6 +32,9 @@ Config (JSON):
   "vo_lufs": -11.5, "vo_master": true      # mic stream pre-mastered to <source>_vo<N>.wav (default on)
 }
   uv run python -m mce.talkshort <config.json>     -> writes the spec + caps_props.json, prints a cut list
+  uv run python -m mce.talkshort <config.json> --render
+      -> also renders the captions with Remotion (a new .mov each time: Premiere caches by path), records
+         it as captions.mov in the config and rebuilds the spec with it — ready for mce.push
 """
 import argparse
 import json
@@ -38,6 +44,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import ff
 from .faces import dense, face_at, motion, track
 from .timeline_xml import _probe
 
@@ -52,7 +59,7 @@ def _norm(w: str) -> str:
 
 
 def load_words(path: str) -> list[dict]:
-    data = json.loads(Path(path).read_text())
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
     segs = data["segments"] if isinstance(data, dict) else data
     out = []
     for s in segs:
@@ -97,9 +104,8 @@ def pieces(take: tuple[float, float], words: list[dict], max_gap: float, fillers
 def quietest(src: str, stream: int, t0: float, t1: float, win: float = 0.01) -> float:
     """Time of the lowest-energy 10 ms window in [t0, t1] of the voice track."""
     import numpy as np
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t0:.3f}", "-t", f"{t1 - t0:.3f}", "-i", src,
-                          "-map", f"0:a:{stream}", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"],
-                         capture_output=True).stdout
+    raw, _ = ff.run(["ffmpeg", "-v", "error", "-ss", f"{t0:.3f}", "-t", f"{t1 - t0:.3f}", "-i", src,
+                     "-map", f"0:a:{stream}", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], binary=True)
     x = np.frombuffer(raw, np.int16).astype(float)
     n = int(8000 * win)
     if len(x) < n:
@@ -110,9 +116,8 @@ def quietest(src: str, stream: int, t0: float, t1: float, win: float = 0.01) -> 
 
 def silences(src: str, stream: int = 0, db: float = -38, min_len: float = 0.3) -> list[tuple[float, float]]:
     """Real pauses in the voice track (ASR word timings sometimes stretch a word across a pause)."""
-    log = subprocess.run(["ffmpeg", "-hide_banner", "-i", src, "-map", f"0:a:{stream}", "-af",
-                          f"silencedetect=n={db}dB:d={min_len}", "-f", "null", "-"],
-                         capture_output=True, text=True).stderr
+    _, log = ff.run(["ffmpeg", "-hide_banner", "-i", src, "-map", f"0:a:{stream}", "-af",
+                     f"silencedetect=n={db}dB:d={min_len}", "-f", "null", "-"])
     st = [float(x) for x in re.findall(r"silence_start: ([\d.]+)", log)]
     en = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", log)]
     return list(zip(st, en))
@@ -147,25 +152,25 @@ def master_voice(src: str, stream: int = 0, chain: str = VOICE_CHAIN) -> str:
     (Single-pass loudnorm pumps the room noise up in pauses; alimiter's default auto-level pushes every
     peak to 0 dBFS — both made the first version sound squashed.)"""
     import hashlib
-    tag = hashlib.md5(chain.encode()).hexdigest()[:6]
+    st = Path(src).stat()  # a re-recorded file with the same name gets a new master
+    tag = hashlib.md5(f"{chain}|{st.st_size}|{st.st_mtime}".encode()).hexdigest()[:6]
     out = Path(src).with_name(Path(src).stem + f"_vo{stream}_{tag}.wav")
     if out.exists():
         return str(out)
     base = ["ffmpeg", "-hide_banner", "-y", "-i", src, "-map", f"0:a:{stream}"]
-    log = subprocess.run(base + ["-af", chain + ",loudnorm=I=-14:TP=-2:LRA=7:print_format=json", "-f", "null", "-"],
-                         capture_output=True, text=True).stderr
+    _, log = ff.run(base + ["-af", chain + ",loudnorm=I=-14:TP=-2:LRA=7:print_format=json", "-f", "null", "-"])
     m = json.loads(log[log.rindex("{"):log.rindex("}") + 1])
     ln = (f"loudnorm=I=-14:TP=-2:LRA=7:linear=true:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
           f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}")
     tmp = out.with_suffix(".tmp.wav")
-    subprocess.run(base + ["-v", "error", "-af", f"{chain},{ln},aresample=48000,"
-                           "alimiter=limit=0.79:level=disabled:attack=5:release=50",
-                           "-ar", "48000", "-ac", "2", str(tmp)], check=True)
+    ff.run(base + ["-v", "error", "-af", f"{chain},{ln},aresample=48000,"
+                   "alimiter=limit=0.79:level=disabled:attack=5:release=50",
+                   "-ar", "48000", "-ac", "2", str(tmp)])
     # filters (denoise, limiter look-ahead) delay the signal: measure it against the source and trim it,
     # or the voice drifts out of lip-sync (30 ms with this chain) and cut points land late
     lag = _lag(src, stream, str(tmp))
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(tmp), "-af",
-                    f"atrim=start={max(0.0, lag):.4f},asetpts=PTS-STARTPTS", str(out)], check=True)
+    ff.run(["ffmpeg", "-v", "error", "-y", "-i", str(tmp), "-af",
+            f"atrim=start={max(0.0, lag):.4f},asetpts=PTS-STARTPTS", str(out)])
     tmp.unlink()
     print(f"voice master: delay {lag * 1000:.1f} ms trimmed")
     return str(out)
@@ -175,14 +180,13 @@ def _lag(src: str, stream: int, processed: str, t: float = 60, d: float = 30) ->
     """Seconds by which `processed` lags the source voice (envelope cross-correlation)."""
     import numpy as np
 
-    total = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", src],
-                                 capture_output=True, text=True).stdout.strip() or 0)
+    total = ff.duration(src)
     if total and total < t + d:  # short file (an excerpt): measure over what there is
         t, d = 0.0, total
 
     def env(f: str, st: int) -> np.ndarray:
-        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(t), "-t", str(d), "-i", f, "-map", f"0:a:{st}",
-                              "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], capture_output=True).stdout
+        raw, _ = ff.run(["ffmpeg", "-v", "error", "-ss", str(t), "-t", str(d), "-i", f, "-map", f"0:a:{st}",
+                         "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], binary=True)
         x = np.abs(np.frombuffer(raw, np.int16).astype(float))
         return np.convolve(x / (x.max() + 1), np.ones(40) / 40, "same")
     a, b = env(src, stream), env(processed, 0)
@@ -191,20 +195,22 @@ def _lag(src: str, stream: int, processed: str, t: float = 60, d: float = 30) ->
     return (int(np.argmax(c)) - m) / 8000
 
 
-def _cover(k: float, x: float, y: float, box: tuple[float, float, float, float]) -> tuple[float, float]:
-    """Clamp a 1920x1080 clip at scale k so it still covers box (x0, y0, x1, y1)."""
-    hw, hh = 960 * k, 540 * k
+def _cover(k: float, x: float, y: float, box: tuple[float, float, float, float],
+           size: tuple[int, int] = (1920, 1080)) -> tuple[float, float]:
+    """Clamp a clip of `size` (as shown: 1080x1920 for a phone's portrait clip) at scale k so it still covers
+    box (x0, y0, x1, y1)."""
+    hw, hh = size[0] / 2 * k, size[1] / 2 * k
     x = min(max(x, box[2] - hw), box[0] + hw)
     y = min(max(y, box[3] - hh), box[1] + hh)
     return x, y
 
 
 def frame_face(face: tuple[float, float, float], pct: float, target: tuple[float, float],
-               box: tuple[float, float, float, float]) -> dict:
+               box: tuple[float, float, float, float], size: tuple[int, int] = (1920, 1080)) -> dict:
     k = pct / 100
-    x = target[0] - (face[0] - 960) * k
-    y = target[1] - (face[1] - 540) * k
-    x, y = _cover(k, x, y, box)
+    x = target[0] - (face[0] - size[0] / 2) * k
+    y = target[1] - (face[1] - size[1] / 2) * k
+    x, y = _cover(k, x, y, box, size)
     return {"scale": round(pct, 2), "x": round(x), "y": round(y)}
 
 
@@ -310,12 +316,25 @@ def phrases(cuts: list[dict], cfg: dict, breaks: list[float] = ()) -> list[dict]
 def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     rel = lambda p: str(p if Path(p).is_absolute() else base / p)
     src = cfg["source"]
+    sp = _probe(src)
+    sz = (sp["width"], sp["height"])  # as shown: landscape camera 1920x1080, upright phone clip 1080x1920
     words = load_words(rel(cfg["transcript"]))
     faces = track(src, out=Path(rel(cfg.get("faces", Path(src).stem + "_faces.json"))))
     fillers = set(cfg.get("fillers", FILLERS))
     split = cfg.get("layout", "full") == "split"
     seam = round(H * cfg.get("split_ratio", 0.4))  # split: picture above the seam, face below (40/60)
     punch = cfg.get("punch", [100, 120, 140])
+
+    # 0. every take must be clean: a stall or drawn-out word inside a sentence is a bad take, and trimming
+    # its pause only hides the hesitation behind a jump cut — pick another take of that line instead
+    if not cfg.get("allow_flaws"):
+        from .takecheck import check
+        bad = [(tk, fl) for tk, fl in zip(cfg["takes"], check(src, words, cfg["takes"], cfg.get("stream", 1) - 1)) if fl]
+        if bad:
+            raise SystemExit("flawed takes — replace them with a clean take of the same line (mce.retakes lists the "
+                             "attempts), or set \"allow_flaws\": true if the user wants them:\n" + "\n".join(
+                f"  {tk[0]}–{tk[1]}: " + "; ".join(f"{f['kind']} at {f['t']:.2f}s ({f['detail']})" for f in fl)
+                for tk, fl in bad))
 
     # 1. cut list
     cuts, t = [], 0.0
@@ -399,6 +418,14 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         speed = max(b.get("min_speed", 0.7), min(1.0, src_len / dur))
         b["dur"], b["speed"] = round(min(dur, src_len / speed), 3), round(speed, 3)
 
+    # a b-roll ending a frame or two before its shot does would flash the empty panel: run it to the shot end
+    shot_ends = [sh["start"] + sh["out"] - sh["in"] for sh in shots]
+    for b in brolls:
+        e = b["at"] + b["dur"]
+        gap = [x for x in shot_ends if 0 < x - e < 0.1]
+        if gap:
+            b["dur"] = round(min(gap) - b["at"], 3)
+
     def covered(t0, t1):
         """b-roll (one clip or several back to back) covers the whole range"""
         t = t0
@@ -421,8 +448,10 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     # full: face high enough that captions on the seam (y≈900) sit under the chin on punch-ins
     full_box, full_target = (0, 0, W, H), (540, cfg.get("full_target_y", 620))
     low_box, low_target = (0, seam, W, H), (540, round(seam + (H - seam) * cfg.get("low_face_y", 0.42)))
-    # full_base > 177.8 (fill) leaves room to lift the face above captions that sit on the seam
-    full_base, low_base = cfg.get("full_base", H / 1080 * 100), cfg.get("low_base", 140.0)  # bottom panel: face fills it
+    # full_base above "fill" (177.8 for a landscape source) leaves room to lift the face above seam captions
+    fill = max(W / sz[0], H / sz[1]) * 100
+    full_base = cfg.get("full_base", fill)
+    low_base = cfg.get("low_base", max(140.0 * 1080 / sz[1], W / sz[0] * 100))  # bottom panel: face fills it
     prev = -1
     locks: list[tuple[str, float]] = []
     xf = cfg.get("xfade", 0.04)
@@ -438,7 +467,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         face = face_at(faces, c["in"], c["out"])
         box, target, b0 = (low_box, low_target, low_base) if low else (full_box, full_target, full_base)
         pl = punch if low else cfg.get("full_punch", punch)  # full-frame shots can punch in less (or not at all)
-        pos = frame_face(face, b0 * pl[lvl % len(pl)] / 100, target, box)
+        pos = frame_face(face, b0 * pl[lvl % len(pl)] / 100, target, box, sz)
         clip = {"file": "src", "start": sh["start"], "in": sh["in"], "out": sh["out"], **pos,
                 "name": f"{sh['id']} {sh['label']}"}
         # face-lock: the frame follows the face (Premiere's Mask-to-Motion + stabilise look) — only when
@@ -459,7 +488,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
                 # scale-lock too: hold the face's size when she leans in/out (bounded, never below the fill)
                 k_ = pos["scale"] * (min(1.25, max(0.85, w0 / p["w"])) if cfg.get("lock_scale", False) else 1)
                 k_ = max(k_, b0 if not low else k_)
-                fp = frame_face((p["cx"], p["cy"], p["w"]), k_, target, box)
+                fp = frame_face((p["cx"], p["cy"], p["w"]), k_, target, box, sz)
                 keys.append({"t": round(p["t"] - sh["in"], 3), **fp})
             keys[0]["t"] = 0
             clip.update(keys[0])
@@ -469,7 +498,7 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
         if low:  # bottom panel: the b-roll above covers the top panel, so no crop is needed for the face;
             pass  # (a crop would also fight face-lock keyframes)
         elif not locked and d > 1.2:  # gentle push so no shot sits dead still
-            z = frame_face(face, pos["scale"] * 1.04, target, box)
+            z = frame_face(face, pos["scale"] * 1.04, target, box, sz)
             clip["keys"] = [{"t": 0, **pos}, {"t": round(d, 3), **z}]
         v_face.append(clip)
     for i, c in enumerate(cuts):
@@ -589,7 +618,10 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     for k in ("project", "replaces", "vo_lufs", "limit_db", "auto_sfx", "sfx", "duck_music", "music_fit", "transitions"):
         if k in cfg:
             spec[k] = cfg[k]
-    if "vo_lufs" in cfg:
+    if afile == "vo" and "vo_lufs" not in cfg:
+        # the master is -14 LUFS but Premiere's stereo mapping costs ~2.5-3 dB: -11.5 renders at about -14
+        spec["vo_lufs"] = -11.5
+    if spec.get("vo_lufs") is not None:
         spec["vo_file"] = afile
     report = [f"{c['start']:6.2f}  src {c['in']:7.2f}–{c['out']:7.2f}  {' '.join(w['word'] for w in c['words'])}"
               for c in cuts]
@@ -600,18 +632,42 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     return spec, props, report
 
 
+def render_captions(props_path: Path, out_dir: Path, stem: str) -> Path:
+    """Render the Remotion Captions composition (transparent ProRes) to a new file."""
+    import shutil
+    import time
+
+    from .config import MCE_HOME
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"caps {stem} {time.strftime('%m%d-%H%M%S')}.mov"
+    npx = shutil.which("npx") or shutil.which("npx.cmd") or "npx"
+    print(f"rendering captions → {out}")
+    r = subprocess.run([npx, "remotion", "render", "Captions", str(out), f"--props={props_path}"],
+                       cwd=MCE_HOME / "remotion")
+    if r.returncode or not out.exists():
+        raise SystemExit("❌ caption render failed (see the Remotion output above)")
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("config")
+    ap.add_argument("--render", action="store_true", help="render the captions and rebuild the spec with them")
     a = ap.parse_args()
     cfgp = Path(a.config).resolve()
-    cfg = json.loads(cfgp.read_text())
+    cfg = json.loads(cfgp.read_text(encoding="utf-8"))
     spec, props, report = build(cfg, cfgp.parent)
-    out = cfgp.with_name(cfg.get("out", cfgp.stem + "_spec.json"))
-    out.write_text(json.dumps(spec, ensure_ascii=False, indent=1))
-    (cfgp.parent / "caps_props.json").write_text(json.dumps(props, ensure_ascii=False, indent=1))
+    out = cfgp.parent / cfg.get("out", cfgp.stem + "_spec.json")  # relative to the config, or absolute
+    props_path = cfgp.parent / "caps_props.json"
+    props_path.write_text(json.dumps(props, ensure_ascii=False, indent=1), encoding="utf-8")
+    if a.render:
+        mov = render_captions(props_path, cfgp.parent / "graphics", cfgp.stem)
+        cfg.setdefault("captions", {})["mov"] = str(mov)
+        cfgp.write_text(json.dumps(cfg, ensure_ascii=False, indent=1), encoding="utf-8")
+        spec, props, report = build(cfg, cfgp.parent)
+    out.write_text(json.dumps(spec, ensure_ascii=False, indent=1), encoding="utf-8")
     print("\n".join(report))
-    print("spec:", out, "\ncaptions props:", cfgp.parent / "caps_props.json")
+    print("spec:", out, "\ncaptions props:", props_path)
 
 
 if __name__ == "__main__":

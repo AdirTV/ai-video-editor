@@ -41,7 +41,21 @@ def _use_mlx() -> bool:
 
 def _device() -> str:
     import torch
+    if torch.cuda.is_available():
+        return "cuda"
     return "mps" if torch.backends.mps.is_available() else "cpu"
+
+
+def _load_asr(name: str, **kw):
+    """WhisperX model on an NVIDIA GPU when CTranslate2 can use one (several times faster), else CPU int8."""
+    import whisperx
+    try:
+        import ctranslate2
+        if ctranslate2.get_cuda_device_count() > 0:
+            return whisperx.load_model(name, device="cuda", compute_type="float16", **kw)
+    except Exception as e:  # CUDA libraries missing/mismatched: CPU still works
+        print(f"(GPU transcription unavailable, using CPU: {str(e).splitlines()[0][:120]})")
+    return whisperx.load_model(name, device="cpu", compute_type="int8", **kw)
 
 
 def _asr_mlx(wav_path: str, lang: str, prompt: str) -> tuple[list[dict], str]:
@@ -106,9 +120,7 @@ def _vote(audio, detect_one, n: int = 12, sec: int = 30) -> str:
 
 
 def detect_language(audio) -> str:
-    import whisperx
-
-    model = whisperx.load_model(DEFAULT_MODEL, device="cpu", compute_type="int8")
+    model = _load_asr(DEFAULT_MODEL)
     lang = _vote(audio, model.detect_language)
     del model
     gc.collect()
@@ -131,10 +143,8 @@ def transcribe(wav_path: str, prompt: str | None = None, batch_size: int = 8,
     if _use_mlx():
         raw, lang = _asr_mlx(wav_path, lang, prompt)
     else:
-        model = whisperx.load_model(
-            MODELS.get(lang, DEFAULT_MODEL), device="cpu", compute_type="int8", language=lang,
-            asr_options={"initial_prompt": prompt or None}, vad_options={"chunk_size": 10},
-        )
+        model = _load_asr(MODELS.get(lang, DEFAULT_MODEL), language=lang,
+                          asr_options={"initial_prompt": prompt or None}, vad_options={"chunk_size": 10})
         raw = model.transcribe(audio, batch_size=batch_size, language=lang, chunk_size=10)["segments"]
         del model
         gc.collect()

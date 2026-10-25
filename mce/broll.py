@@ -40,7 +40,7 @@ def secs(t: str | float | None) -> float | None:
 
 def search(query: str, n: int = 8) -> list[dict]:
     out = subprocess.run([_ytdlp(), f"ytsearch{n}:{query}", "--flat-playlist", "-J", "--no-warnings"],
-                         capture_output=True, text=True, check=True).stdout
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout
     rows = []
     for e in json.loads(out).get("entries", []):
         rows.append({"id": e.get("id"), "url": e.get("url") or f"https://www.youtube.com/watch?v={e.get('id')}",

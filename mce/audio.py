@@ -4,10 +4,11 @@ All detectors work on a dB envelope sampled every HOP seconds. Thresholds are
 relative to each recording's own noise floor / speech level, so mic gain and
 game volume don't need calibrating.
 """
-import subprocess
 import wave
 
 import numpy as np
+
+from . import ff
 
 SR = 16000
 HOP = 0.05  # seconds per envelope frame
@@ -15,16 +16,12 @@ HOP = 0.05  # seconds per envelope frame
 
 def extract(src: str, stream: int, out: str) -> None:
     """Extract one audio stream (0-based among audio streams) as 16 kHz mono wav."""
-    subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-i", src, "-map", f"0:a:{stream}",
-         "-ac", "1", "-ar", str(SR), out],
-        check=True,
-    )
+    ff.run(["ffmpeg", "-y", "-v", "error", "-i", src, "-map", f"0:a:{stream}", "-ac", "1", "-ar", str(SR), out])
 
 
 def to_mono16k(path: str, out: str) -> None:
     """Any audio file → the 16 kHz mono wav the detectors and ASR expect."""
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", path, "-ac", "1", "-ar", str(SR), out], check=True)
+    ff.run(["ffmpeg", "-y", "-v", "error", "-i", path, "-ac", "1", "-ar", str(SR), out])
 
 
 def load(path: str) -> np.ndarray:

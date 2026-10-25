@@ -1,8 +1,8 @@
 """Read container metadata with ffprobe."""
-import json
-import subprocess
 from dataclasses import dataclass, field
 from fractions import Fraction
+
+from .ff import FFError, display_size, probe_json, rotation, stream_fps
 
 
 @dataclass
@@ -13,6 +13,7 @@ class MediaInfo:
     fps: Fraction
     duration: float
     audio_streams: list[dict] = field(default_factory=list)
+    rotation: int = 0  # width/height are as shown; the stored frames are turned by this (phones)
 
     @property
     def fps_float(self) -> float:
@@ -25,12 +26,10 @@ class MediaInfo:
 
 
 def probe(path: str) -> MediaInfo:
-    out = subprocess.run(
-        ["ffprobe", "-v", "error", "-print_format", "json", "-show_streams", "-show_format", path],
-        check=True, capture_output=True, text=True,
-    ).stdout
-    data = json.loads(out)
-    video = next(s for s in data["streams"] if s["codec_type"] == "video")
+    data = probe_json(path)
+    video = next((s for s in data["streams"] if s["codec_type"] == "video"), None)
+    if video is None:
+        raise FFError(f"{path} has no video stream")
     audio = [
         {
             "index": i,
@@ -44,9 +43,10 @@ def probe(path: str) -> MediaInfo:
     ]
     return MediaInfo(
         path=path,
-        width=int(video["width"]),
-        height=int(video["height"]),
-        fps=Fraction(video["avg_frame_rate"]),
+        width=display_size(video)[0],
+        height=display_size(video)[1],
+        fps=stream_fps(video) or Fraction(30),
         duration=float(data["format"]["duration"]),
         audio_streams=audio,
+        rotation=rotation(video),
     )

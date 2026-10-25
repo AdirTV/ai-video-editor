@@ -14,10 +14,11 @@ Speed: ~1/10 real time on Apple Silicon (MPS) — run hour-long files in the bac
 """
 import argparse
 import json
-import subprocess
 from pathlib import Path
 
 import numpy as np
+
+from . import ff
 
 MODEL = "htdemucs"  # "htdemucs_ft" is ~4x slower and slightly cleaner
 SR = 44100
@@ -28,14 +29,12 @@ XFADE = 2.0    # overlap between passes, crossfaded
 def _read(src: str, stream: int | None, start: float, dur: float) -> np.ndarray:
     cmd = ["ffmpeg", "-v", "error", "-ss", str(start), "-i", src, "-t", str(dur),
            "-map", f"0:a:{stream or 0}", "-ac", "2", "-ar", str(SR), "-f", "f32le", "-"]
-    raw = subprocess.run(cmd, capture_output=True, check=True).stdout
+    raw, _ = ff.run(cmd, binary=True)
     return np.frombuffer(raw, np.float32).reshape(-1, 2).T.copy()  # (2, n)
 
 
 def _duration(src: str) -> float:
-    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", src],
-                         capture_output=True, text=True, check=True).stdout
-    return float(out.strip())
+    return ff.duration(src)
 
 
 def _device() -> str:
@@ -58,7 +57,7 @@ def separate(src: str, out_dir: str | Path, stream: int | None = None, stems: st
     stamp = out / "stems.json"
     key = {"src": str(Path(src).resolve()), "mtime": Path(src).stat().st_mtime, "stream": stream,
            "stems": stems, "start": start, "end": end, "model": model}
-    if stamp.exists() and json.loads(stamp.read_text()) == key and all(Path(p).exists() for p in paths.values()):
+    if stamp.exists() and json.loads(stamp.read_text(encoding="utf-8")) == key and all(Path(p).exists() for p in paths.values()):
         return paths
 
     sep = Separator(model=model, device=_device(), progress=False)
@@ -90,7 +89,7 @@ def separate(src: str, out_dir: str | Path, stream: int | None = None, stems: st
     finally:
         for w in writers.values():
             w.close()
-    stamp.write_text(json.dumps(key))
+    stamp.write_text(json.dumps(key), encoding="utf-8")
     return paths
 
 

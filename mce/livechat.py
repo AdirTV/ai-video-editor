@@ -19,7 +19,6 @@ import re
 import statistics
 import time
 import urllib.request
-from collections import Counter
 from pathlib import Path
 
 from .sheets import fmt
@@ -171,16 +170,16 @@ def main() -> None:
         out.mkdir(parents=True, exist_ok=True)
         vid = vod_id(a.vod)
         info = fetch_vod_info(vid)
-        (out / "vod.json").write_text(json.dumps(info, ensure_ascii=False, indent=1))
+        (out / "vod.json").write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")
         chat = fetch_chat(vid)
-        (out / "chat.json").write_text(json.dumps(chat, ensure_ascii=False))
+        (out / "chat.json").write_text(json.dumps(chat, ensure_ascii=False), encoding="utf-8")
         print(f"{info['channel']} — {info['title']} ({fmt(info['length'])}): {len(chat)} chat messages from "
               f"{len({c['user'] for c in chat})} chatters, {len(info['clips'])} viewer clips → {out}")
         return
-    info = json.loads((out / "vod.json").read_text())
-    chat = json.loads((out / "chat.json").read_text())
+    info = json.loads((out / "vod.json").read_text(encoding="utf-8"))
+    chat = json.loads((out / "chat.json").read_text(encoding="utf-8"))
     picks = spikes(chat, info["length"], a.window, a.lag, top=a.top)
-    (out / "chat_spikes.json").write_text(json.dumps(picks, ensure_ascii=False, indent=1))
+    (out / "chat_spikes.json").write_text(json.dumps(picks, ensure_ascii=False, indent=1), encoding="utf-8")
     for p in picks:
         print(f"{fmt(p['moment'])}  score {p['score']:5.1f}  {p['kind']:5s}  {p['msgs']} msgs/{p['users']} users  "
               f"| {' / '.join(p['sample'])}")

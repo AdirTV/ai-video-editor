@@ -37,7 +37,8 @@ import json
 import math
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+
+from .ff import url_to_path
 
 # groups whose clips push generates or rewrites, and the spec settings behind them
 GROUP_FLAGS = {"sfx": ("auto_sfx", "sfx"), "music": ("music_playlist", "music_fit", "duck_music"),
@@ -59,10 +60,7 @@ def _rate(el) -> float:
 
 
 def _path(url: str) -> str:
-    p = unquote(urlparse(url).path)
-    while p.startswith("//"):
-        p = p[1:]
-    return str(Path(p).resolve())
+    return url_to_path(url)
 
 
 def _db(lin: float) -> float:
@@ -95,6 +93,7 @@ def parse(xml_text: str) -> dict:
                     cut = s if align in ("start", "start-black") else en if align in ("end", "end-black") else math.ceil((s + en) / 2)  # odd lengths: the extra frame is before the cut
                     trans.append({"kind": kind, "track": ti, "name": e.findtext("effect/name") or e.findtext("name"),
                                   "s": s, "e": en, "cut": cut, "align": align})
+            tmap = {id(items[j]): t for j, t in zip([j for j, x in enumerate(items) if x.tag == "transitionitem"], trans)}
             for i, e in enumerate(items):
                 if e.tag != "clipitem":
                     continue
@@ -106,7 +105,6 @@ def parse(xml_text: str) -> dict:
                 cin, cout = int(e.findtext("in")), int(e.findtext("out"))
                 # a clip that starts/ends inside a transition has start/end -1; its in/out include the handle,
                 # and Premiere writes the same handle on both sides: the part after the cut
-                tmap = {id(items[j]): t for j, t in zip([j for j, x in enumerate(items) if x.tag == "transitionitem"], trans)}
                 before = tmap.get(id(items[i - 1])) if i > 0 else None
                 after = tmap.get(id(items[i + 1])) if i + 1 < len(items) else None
                 if s < 0 and before:
@@ -709,6 +707,10 @@ def read_live(client, seq: str, dest: Path) -> dict:
                     for name in cl.get("effects", []):
                         if name in BASE_COMPONENTS:
                             continue
+                        if name.startswith("Crop") and c.get("crop"):
+                            # our XML's crop filter shows up as "Crop (Legacy)": it is the clip's "crop", not
+                            # an added effect (taking it for one stacked a 2nd Crop on hundreds of clips per push)
+                            continue
                         fx[name] = c["fx"].get(name) or _effect_props(client, cl["nodeId"], name)
                     c["fx"] = fx
         offset = (d.get("pagination") or {}).get("nextOffset")
@@ -730,7 +732,7 @@ def snapshot_from_spec(spec_path: str) -> dict:
     """No snapshot (pushed before snapshots existed): rebuild what push would have built."""
     from .push import assign_ids, prepare
     from .timeline_xml import build
-    spec = json.loads(Path(spec_path).read_text())
+    spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     assign_ids(spec)
     built, groups = prepare(spec, quiet=True)
     pre = copy.deepcopy(built)
@@ -759,7 +761,7 @@ def pull(spec_path: str, seq: str | None = None, against: str | None = None, dry
          client=None, quiet: bool = False) -> tuple[list[str], list[str]] | None:
     """Merge the editor's changes in `seq` into the spec. Returns (report, unplaced),
     or None when there's nothing to compare against."""
-    spec = json.loads(Path(spec_path).read_text())
+    spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
     own = client is None
     if own:
         from .premiere import Client
@@ -775,7 +777,7 @@ def pull(spec_path: str, seq: str | None = None, against: str | None = None, dry
         if against:
             snap = snapshot_from_spec(against)
         elif snap_file.exists():
-            snap = json.loads(snap_file.read_text())
+            snap = json.loads(snap_file.read_text(encoding="utf-8"))
         else:
             old = next((p for p in sorted(Path(spec_path).parent.glob("*.json"))
                         if _spec_named(p, seq)), None)
@@ -795,8 +797,8 @@ def pull(spec_path: str, seq: str | None = None, against: str | None = None, dry
     m.run()
     if m.applied and not dry:
         backup = Path(spec_path).with_suffix(".prepull.json")
-        backup.write_text(Path(spec_path).read_text())
-        Path(spec_path).write_text(json.dumps(spec, ensure_ascii=False, indent=1))
+        backup.write_text(Path(spec_path).read_text(encoding="utf-8"))
+        Path(spec_path).write_text(json.dumps(spec, ensure_ascii=False, indent=1), encoding="utf-8")
     if not quiet or m.report or m.unplaced:
         head = f"Your changes in {seq!r}" + (" (dry run)" if dry else "") + ":"
         print("\n  ".join([head] + (m.report or ["none"])))
@@ -807,7 +809,7 @@ def pull(spec_path: str, seq: str | None = None, against: str | None = None, dry
 
 def _spec_named(p: Path, name: str) -> bool:
     try:
-        d = json.loads(p.read_text())
+        d = json.loads(p.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
         return False
     return isinstance(d, dict) and d.get("name") == name and "video" in d

@@ -110,13 +110,13 @@ def bounds(segments, duration, t, setup=12.0, after=8.0, min_len=15.0, max_len=6
 
 
 def build(analysis: Path, live: Path | None, top=15, **kw) -> list[dict]:
-    tl = json.loads((analysis / "timeline.json").read_text())
-    segments = json.loads((analysis / "transcript.json").read_text())
+    tl = json.loads((analysis / "timeline.json").read_text(encoding="utf-8"))
+    segments = json.loads((analysis / "transcript.json").read_text(encoding="utf-8"))
     spikes, chat = [], []
     if live and (live / "chat.json").exists():
         from . import livechat
-        info = json.loads((live / "vod.json").read_text())
-        chat = json.loads((live / "chat.json").read_text())
+        info = json.loads((live / "vod.json").read_text(encoding="utf-8"))
+        chat = json.loads((live / "chat.json").read_text(encoding="utf-8"))
         spikes = livechat.spikes(chat, info["length"], top=40)
     clips = []
     for r in candidates(tl, spikes, chat_reads(chat, segments), len(chat)):
@@ -156,9 +156,9 @@ def main() -> None:
     analysis = Path(a.analysis)
     live = Path(a.live) if a.live else analysis.parent / "live"
     clips = build(analysis, live, a.top, setup=a.setup, after=a.after, min_len=a.min_len, max_len=a.max_len)
-    src = json.loads((analysis / "timeline.json").read_text())["source"]
-    (analysis / "clips.json").write_text(json.dumps(clips, ensure_ascii=False, indent=1))
-    (analysis / "clips.md").write_text(to_markdown(clips, src))
+    src = json.loads((analysis / "timeline.json").read_text(encoding="utf-8"))["source"]
+    (analysis / "clips.json").write_text(json.dumps(clips, ensure_ascii=False, indent=1), encoding="utf-8")
+    (analysis / "clips.md").write_text(to_markdown(clips, src), encoding="utf-8")
     for c in clips:
         print(f"{c['n']:2d}. {fmt(c['start'])}–{fmt(c['end'])} ({c['dur']:.0f}s) rank {c['rank']:5.1f}  "
               f"{', '.join(c['why'])}")

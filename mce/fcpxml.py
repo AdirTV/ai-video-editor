@@ -21,9 +21,9 @@ Marker times are source seconds; they land on the timeline wherever that
 moment ended up (markers on cut material are dropped).
 """
 from pathlib import Path
-from urllib.parse import quote
 from xml.sax.saxutils import escape
 
+from .ff import pathurl
 from .probe import MediaInfo
 
 SEQ_W, SEQ_H = 1920, 1080
@@ -50,8 +50,10 @@ def _param(pid: str, value: str, name: str | None = None) -> str:
             f"<name>{name or pid}</name><value>{value}</value></parameter>")
 
 
-def _motion(scale: float, x: float, y: float, keys: list[tuple[int, float, float, float]] = ()) -> str:
-    """Basic Motion. keys: (when_frame, scale, x, y) keyframes, same units as the statics."""
+def _motion(scale: float, x: float, y: float, keys: list[tuple[int, float, float, float]] = (),
+            rotation: float = 0) -> str:
+    """Basic Motion. keys: (when_frame, scale, x, y) keyframes, same units as the statics.
+    rotation: degrees clockwise (static)."""
     sk = "".join(f"<keyframe><when>{w}</when><value>{s:g}</value></keyframe>" for w, s, _, _ in keys)
     ck = "".join(f"<keyframe><when>{w}</when><value><horiz>{h:g}</horiz><vert>{v:g}</vert></value></keyframe>"
                  for w, _, h, v in keys)
@@ -60,6 +62,7 @@ def _motion(scale: float, x: float, y: float, keys: list[tuple[int, float, float
             "<mediatype>video</mediatype>"
             + _param("scale", f"{scale:g}{sk}", "Scale").replace(f"<value>{scale:g}{sk}</value>", f"<value>{scale:g}</value>{sk}")
             + _param("center", f"<horiz>{x:g}</horiz><vert>{y:g}</vert>", "Center").replace("</value></parameter>", f"</value>{ck}</parameter>")
+            + (_param("rotation", f"{rotation:g}", "Rotation") if rotation else "")
             + "</effect></filter>")
 
 
@@ -100,7 +103,7 @@ def _file(info: MediaInfo, file_id: str, total: int) -> str:
         for a in info.audio_streams
     )
     return (f'<file id="{file_id}"><name>{escape(p.name)}</name>'
-            f"<pathurl>file://{quote(str(p))}</pathurl>{_rate(info)}<duration>{total}</duration>"
+            f"<pathurl>{pathurl(p)}</pathurl>{_rate(info)}<duration>{total}</duration>"
             f"<media><video><samplecharacteristics>{_rate(info)}<width>{info.width}</width>"
             f"<height>{info.height}</height><pixelaspectratio>square</pixelaspectratio>"
             f"</samplecharacteristics></video>{audio}</media></file>")
@@ -258,7 +261,7 @@ def build(plan: dict, info: MediaInfo) -> str:
         else:
             info_b["written"] = True
             pb = Path(path).resolve()
-            fref = (f'<file id="{info_b["id"]}"><name>{escape(pb.name)}</name><pathurl>file://{quote(str(pb))}</pathurl>'
+            fref = (f'<file id="{info_b["id"]}"><name>{escape(pb.name)}</name><pathurl>{pathurl(pb)}</pathurl>'
                     f"{brate}<duration>{round(info_b['duration'] * bfps)}</duration><media><video><samplecharacteristics>"
                     f"{brate}<width>{info_b['width']}</width><height>{info_b['height']}</height></samplecharacteristics>"
                     f"</video></media></file>")
@@ -267,7 +270,7 @@ def build(plan: dict, info: MediaInfo) -> str:
             f'<clipitem id="v3-b{i + 1}"><name>B-roll (jump cut)</name><enabled>TRUE</enabled>'
             f"<duration>{round(info_b['duration'] * bfps)}</duration>{brate}"
             f"<start>{round(a_t * fps)}</start><end>{round(a_t * fps) + b_dur}</end>"
-            f"<in>{b_in}</in><out>{b_in + round(length * bfps)}</out>{fref}{_motion(sc, 0, 0)}</clipitem>")
+            f"<in>{b_in}</in><out>{b_in + round(length * bfps)}</out>{fref}{_motion(sc, 0, 0, rotation=info_b.get("rot", 0))}</clipitem>")
 
     for m in plan.get("markers", []):
         t = _src_to_tl(m["src"], mapping)

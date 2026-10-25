@@ -1,7 +1,7 @@
 [project]
 name = "mce"
 version = "0.1.0"
-description = "Minecraft auto-editor: analyze gameplay recordings and export Premiere Pro sequences"
+description = "AI video editor for Premiere Pro: analyze recordings, build editable sequences, captions, music and SFX"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "whisperx==3.8.6",
@@ -23,3 +23,8 @@ mce = "mce.cli:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

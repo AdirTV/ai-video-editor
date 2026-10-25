@@ -48,7 +48,7 @@ def detect(img: np.ndarray, min_score: float = 0.7, width: int = 960) -> list[tu
 def track(src: str, every: float = 0.5, out: Path | None = None) -> list[dict]:
     out = out or Path(src).with_name(Path(src).stem + "_faces.json")
     if out.exists():
-        cached = json.loads(out.read_text())
+        cached = json.loads(out.read_text(encoding="utf-8"))
         if isinstance(cached, dict) and cached.get("detector") == DETECTOR:
             return cached["rows"]  # (a plain list = an older detector's track: redo it)
     cap = cv2.VideoCapture(src)
@@ -71,7 +71,7 @@ def track(src: str, every: float = 0.5, out: Path | None = None) -> list[dict]:
             prev = np.array([x + w / 2, y + hh / 2])
             rows.append({"t": round(f / fps, 2), "cx": round(float(prev[0])), "cy": round(float(prev[1])),
                          "w": round(w)})
-    out.write_text(json.dumps({"detector": DETECTOR, "rows": rows}))
+    out.write_text(json.dumps({"detector": DETECTOR, "rows": rows}), encoding="utf-8")
     return rows
 
 
@@ -90,7 +90,7 @@ def dense(src: str, t0: float, t1: float, every: float = 0.1, cache: Path | None
     anchor = the speaker's face around then (face_at): detections farther than ~1.5 face widths from it are
     background faces/posters, never the speaker. Cached per range in `cache` (a json dict)."""
     key = f"{DETECTOR}-{t0:.3f}-{t1:.3f}-{every}" + (f"-a{anchor[0]:.0f},{anchor[1]:.0f}" if anchor else "")
-    store = json.loads(cache.read_text()) if cache and cache.exists() else {}
+    store = json.loads(cache.read_text(encoding="utf-8")) if cache and cache.exists() else {}
     if key in store:
         return store[key]
     cap = cv2.VideoCapture(src)
@@ -134,7 +134,7 @@ def dense(src: str, t0: float, t1: float, every: float = 0.1, cache: Path | None
                for tt, x, y, w in zip(a[:, 0], sm(1), sm(2), sm(3))]
     if cache:
         store[key] = out
-        cache.write_text(json.dumps(store))
+        cache.write_text(json.dumps(store), encoding="utf-8")
     return out
 
 

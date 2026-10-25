@@ -5,9 +5,10 @@ YouTube target (-14 LUFS integrated) lands the whole mix close to it; music and
 SFX levels are already set relative to the voice.
 """
 import re
-import subprocess
 import tempfile
 from pathlib import Path
+
+from . import ff
 
 
 def lufs_of_ranges(path: str, ranges: list[tuple[float, float]]) -> float:
@@ -16,14 +17,17 @@ def lufs_of_ranges(path: str, ranges: list[tuple[float, float]]) -> float:
         parts = []
         for i, (a, b) in enumerate(ranges):
             p = Path(d) / f"{i}.wav"
-            subprocess.run(["ffmpeg", "-v", "error", "-ss", str(a), "-t", str(b - a), "-i", path,
-                            "-ac", "2", "-ar", "48000", str(p)], check=True)
-            parts.append(f"file '{p}'")
+            ff.run(["ffmpeg", "-v", "error", "-ss", str(a), "-t", str(b - a), "-i", path,
+                    "-ac", "2", "-ar", "48000", str(p)])
+            parts.append(f"file '{p.as_posix()}'")  # concat lists treat backslashes as escapes (Windows paths)
         lst = Path(d) / "l.txt"
-        lst.write_text("\n".join(parts))
-        log = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-f", "concat", "-safe", "0", "-i", str(lst),
-                              "-af", "ebur128", "-f", "null", "-"], capture_output=True, text=True).stderr
-    return float(re.findall(r"I:\s*(-?[\d.]+) LUFS", log)[-1])
+        lst.write_text("\n".join(parts), encoding="utf-8")
+        _, log = ff.run(["ffmpeg", "-hide_banner", "-nostats", "-f", "concat", "-safe", "0", "-i", str(lst),
+                         "-af", "ebur128", "-f", "null", "-"])
+    found = re.findall(r"I:\s*(-?[\d.]+) LUFS", log)
+    if not found:
+        raise ff.FFError(f"couldn't measure the loudness of {path}")
+    return float(found[-1])
 
 
 def normalize_vo(spec: dict, vo_file: str = "vo", target: float = -14.0) -> str:
@@ -67,4 +71,7 @@ def duck_music(spec: dict, music_file: str = "music", under: str = "vo", lift_db
             if keys:
                 c["gain_keys"] = [[0, base]] + keys + [[round(e0 - s0, 3), base]]
                 n += 1
+    if not n:
+        return (f"music stays at its level: no pause of {min_gap:g}s+ in the speech to lift it in "
+                f"({len(merged)} speech block(s))")
     return f"ducked {n} music clip(s) around {len(merged)} speech block(s)"

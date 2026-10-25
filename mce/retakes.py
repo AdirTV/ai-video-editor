@@ -9,7 +9,10 @@ and I'm gonna share one fact every day"). This finds:
     the abandoned beginning is cut;
   * off-script talk between attempts ("okay", "no", "one sec", "רגע", "עוד פעם").
 
-  uv run python -m mce.retakes analysis/transcript.json [--json analysis/retakes.json] [--window 60]
+  uv run python -m mce.retakes analysis/transcript.json --media rec.mp4 [--stream 0] [--json …] [--window 60]
+
+With --media it also listens to every attempt (mce.takecheck): a take that stalls mid-sentence or drags a word
+loses to a clean take of the same line, and kept takes with flaws are printed with ⚠.
 
 Prints each group (✔ kept, ✘ dropped, with the reason) and writes `takes`: the source ranges to keep, in
 order, ready for a talkshort config or a paper edit. It's a proposal — read it, and override any pick
@@ -89,7 +92,7 @@ def lcs(a: list[str], b: list[str]) -> int:
 
 
 def load(path: str) -> list[dict]:
-    data = json.loads(Path(path).read_text())
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
     segs = data["segments"] if isinstance(data, dict) else data
     words = []
     for s in segs:
@@ -206,10 +209,11 @@ def related(a: dict, b: dict) -> bool:
 
 def score(x: dict, longest: int, rank: float) -> float:
     return (2.0 * x["complete"] + 1.0 * len(x["toks"]) / max(longest, 1) + 0.5 * x["conf"]
-            - 0.25 * x["fillers"] - 0.2 * x["pauses"] + 0.6 * rank)
+            - 0.25 * x["fillers"] - 0.2 * x["pauses"] - 1.2 * len(x.get("flaws", [])) + 0.6 * rank)
 
 
-def find(words: list[dict], window: float = 60.0) -> tuple[list[dict], list[list[int]]]:
+def find(words: list[dict], window: float = 60.0, media: str | None = None,
+         stream: int = 0) -> tuple[list[dict], list[list[int]]]:
     atts: list[dict] = []
     for u in utterances(words):
         for piece, reason in split_restarts(u):
@@ -217,6 +221,11 @@ def find(words: list[dict], window: float = 60.0) -> tuple[list[dict], list[list
                 x = attempt(piece, None if reason == "repeated word?" else reason)
                 x["check"] = reason == "repeated word?"
                 atts.append(x)
+    if media:  # listen to each attempt: stalls / drawn-out words make a take lose to a clean one
+        from .takecheck import envelope, flaws
+        for x in atts:
+            if not x.get("clip"):
+                x["flaws"] = flaws(x["_ws"], envelope(media, stream, x["start"], x["end"]), x["start"])
     atts = split_at_next(atts, window)
     group = list(range(len(atts)))  # union-find
     root = lambda i: i if group[i] == i else root(group[i])  # noqa: E731
@@ -291,8 +300,10 @@ def main() -> None:
     ap.add_argument("transcript")
     ap.add_argument("--json", help="write groups + keep ranges here (default: retakes.json next to the transcript)")
     ap.add_argument("--window", type=float, default=60.0, help="max seconds between two attempts of one line")
+    ap.add_argument("--media", help="the recording: also listen for stalls / drawn-out words (recommended)")
+    ap.add_argument("--stream", type=int, default=0, help="voice audio stream of --media (0-based)")
     a = ap.parse_args()
-    atts, groups = find(load(a.transcript), a.window)
+    atts, groups = find(load(a.transcript), a.window, a.media, a.stream)
     fmt = lambda s: f"{int(s // 60)}:{s % 60:05.2f}"  # noqa: E731
     where = lambda x: f"{fmt(x['start'])}–{fmt(x['end'])}" + (f" [{x['clip']} {x['src'][0]:.2f}–{x['src'][1]:.2f}]" if x.get("clip") else "")  # noqa: E731
     for n, g in enumerate(groups, 1):
@@ -300,7 +311,8 @@ def main() -> None:
         for i in g:
             x = atts[i]
             mark = "✘" if x["drop"] else "✔"
-            print(f"  {mark} {where(x)}  {x['text'][:90]}" + (f"   ({x['drop']})" if x["drop"] else ""))
+            print(f"  {mark} {where(x)}  {x['text'][:90]}" + (f"   ({x['drop']})" if x["drop"] else "")
+                  + "".join(f"\n      ⚠ {f['kind']} at {f['t']:.2f}s ({f['detail']})" for f in x.get("flaws", [])))
     lone = [x for x in atts if x["drop"] and not any(atts.index(x) in g for g in groups)]
     if lone:
         print("\n— false starts / off-script / said again later")
@@ -322,7 +334,7 @@ def main() -> None:
                     for i in g] for g in groups],
         "dropped": [{k: x[k] for k in ("clip", "src", "start", "end", "text", "drop") if k in x} for x in atts if x["drop"]],
         "check": [{k: x[k] for k in ("clip", "src", "start", "end", "text") if k in x} for x in checks],
-    }, ensure_ascii=False, indent=1))
+    }, ensure_ascii=False, indent=1), encoding="utf-8")
     print("→", out)
 
 

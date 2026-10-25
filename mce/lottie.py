@@ -31,7 +31,7 @@ def fetch(url: str, name: str) -> str:
     if not {"v", "layers"} <= data.keys():
         raise SystemExit("not a Lottie animation (missing v/layers)")
     LIB.mkdir(parents=True, exist_ok=True)
-    (LIB / f"{name}.json").write_text(json.dumps(data, separators=(",", ":")))
+    (LIB / f"{name}.json").write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
     secs = (data.get("op", 0) - data.get("ip", 0)) / (data.get("fr") or 30)
     print(f"{data.get('w')}x{data.get('h')}, {secs:.2f}s @ {data.get('fr')} fps")
     return f"lottie/{name}.json"
