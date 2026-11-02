@@ -9,7 +9,7 @@ mechanic), find the shot — don't leave a marker for the user unless nothing us
 per idea, a few seconds each, matching what is said at that moment.
 1. Own footage first: the project's `footage/`, earlier projects in the editing folder (search file names and
    transcripts), the official clips already downloaded there.
-2. `uv run python -m mce.broll search "<thing> <game/brand>"` — prefer the official channel (Minecraft, Rockstar,
+2. `uv run python -m mce.broll search "<thing> <game/brand>"` — prefer the official channel (the game studio,
    the brand), then clear tutorials/showcases; search in English even for Hebrew videos (more footage).
 3. `uv run python -m mce.broll scan <id>` → a frame sheet across the whole video (low-res, fast): look at it and find
    where the thing is actually on screen. Not there → next result.

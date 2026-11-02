@@ -1,7 +1,7 @@
 # AI video editor (Premiere + Claude)
 
 - **Installing for a user?** Follow `INSTALL_FOR_CLAUDE.md` step by step.
-- **Editing?** The `video-edit` skill is the workflow (plus `sfx`, and `minecraft-edit` for Minecraft footage);
+- **Editing?** The `video-edit` skill is the workflow (plus `sfx`, and any skill an add-on in `plugins/` brings);
   tools live in `mce/` (`uv run python -m mce.<tool>`), graphics in `remotion/`. Health check:
   `uv run python setup/doctor.py`.
 - Skills: edit them in `skills/` (path placeholders), then `uv run python setup/install_skills.py`. Keep them
@@ -13,3 +13,5 @@
   (gitignored, auto-loaded) — see `remotion/README.md`.
 - `style.md`, `vocab.txt` and `brand.json` are the user's personal files (gitignored); `style.template*.md` and
   `brand.example.json` are the shared starts.
+- Add-ons (`plugins/<name>/`, gitignored, each its own repo) extend the editor for one kind of video — see
+  `plugins/README.md`. Keep this repo general: anything specific to one game or format belongs in an add-on.

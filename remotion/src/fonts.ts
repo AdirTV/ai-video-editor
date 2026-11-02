@@ -22,11 +22,19 @@ export const INTER = `${loadInter("normal", { weights: ["600", "800", "900"], su
 export const CARLITO = `${loadCarlito("normal", { weights: ["700"], subsets: ["latin"] }).fontFamily}, ${HEEBO}`;
 export const PIXELIFY = loadPixelify("normal", { weights: ["700"], subsets: ["latin"] }).fontFamily;
 
-// Local Minecraft fonts in public/mc/. @remotion/fonts delays the render until they load and fails it
-// (cancelRender) if a file is missing, instead of silently drawing a fallback font.
-const local = (family: string, file: string) => {
+// A font file in remotion/public/ (e.g. one an add-on ships). @remotion/fonts delays the render until it
+// loads and fails it (cancelRender) if the file is missing, instead of silently drawing a fallback font.
+export const localFont = (family: string, file: string) => {
   if (typeof document !== "undefined") loadLocal({ family, url: staticFile(file) });
   return family;
 };
-export const MINECRAFTIA = local("Minecraftia", "mc/Minecraftia.ttf");
-export const MINECRAFT_TEN = local("MinecraftTen", "mc/MinecraftTen.ttf");
+
+// Fonts Captions can use by name (the `font` prop / brand.json captionFont). Add-ons in plugins/ add theirs:
+// `captionFonts.myfont = { family: localFont("My Font", "x/My.ttf"), width: 0.6, weight: 400 }`.
+// width = average glyph width (em), used to keep a caption on one line; weight overrides the look's weight.
+export const captionFonts: Record<string, { family: string; width?: number; weight?: number }> = {
+  rubik: { family: RUBIK },
+  heebo: { family: HEEBO },
+  // Calibri-metric font: the stream-clip / podcast-short caption look (Hebrew falls back to Heebo)
+  carlito: { family: CARLITO },
+};

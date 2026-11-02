@@ -18,7 +18,7 @@ const Flake: React.FC<{ size: number; color: string }> = ({ size, color }) => (
   </svg>
 );
 
-// The screen freezes over: frost creeps in from the edges (like Minecraft's powder-snow overlay),
+// The screen freezes over: frost creeps in from the edges,
 // snowflakes grow along the border, a cold tint settles in. `grow` = seconds to full frost.
 export const Frost: React.FC<Props<"Frost">> = ({ grow = 1.2, tint = 0.22 }) => {
   const frame = useCurrentFrame();

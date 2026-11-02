@@ -74,8 +74,8 @@ check("panel design", (cep / "index.html").exists() and "cmd-count" in (cep / "i
       "bash panel/install.sh (Mac) or re-run the installer", required=False)
 
 skills = HOME / ".claude" / "skills"
-_cfgd = json.loads(cfg.read_text(encoding="utf-8-sig")) if cfg.exists() else {}
-for s in ("video-edit", "sfx") + (("minecraft-edit",) if _cfgd.get("minecraft", True) else ()):
+from mce.plugins import skill_dirs  # noqa: E402
+for s in ("video-edit", "sfx", *(d.name for d in skill_dirs())):
     md = skills / s / "SKILL.md"
     check(f"skill: {s}", md.exists(), "uv run python setup/install_skills.py")
     if md.exists() and "uv run" in (text := md.read_text(encoding="utf-8")):

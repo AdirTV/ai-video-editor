@@ -1,6 +1,6 @@
 # Motion recipes (learned from downloaded editor project files)
 
-Pulled out of 6 Premiere projects (`text`, `minecraft`, `black wood introo`, `invideo`, `project file` = "Gojo and Toji")
+Pulled out of 6 Premiere projects (`text`, `gameplay`, `black wood introo`, `invideo`, `project file` = "Gojo and Toji")
 and 4 After Effects projects (`text pop`, Mr Beast `effect 2` / `effect 3`), 2026-10-21. Numbers are the editor's real
 keyframes. Times are seconds from the clip's start; positions are in frame units (0.5 = centre, 1.0 = bottom/right edge).
 

@@ -27,7 +27,9 @@ const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
 
 fs.mkdirSync(GALLERY, { recursive: true });
 console.log("bundling…");
-const serveUrl = await bundle({ entryPoint: path.join(ROOT, "src", "index.ts") });
+// add-ons in ../plugins/ resolve packages from this folder (as remotion.config.ts does for the CLI)
+const serveUrl = await bundle({ entryPoint: path.join(ROOT, "src", "index.ts"),
+  webpackOverride: (c) => ({ ...c, resolve: { ...c.resolve, modules: [path.join(ROOT, "node_modules"), "node_modules"] } }) });
 const comps = await getCompositions(serveUrl, { envVariables: env });
 
 const sections: string[] = [];

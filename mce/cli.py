@@ -9,7 +9,7 @@ import json
 import time
 from pathlib import Path
 
-from . import audio, fcpxml, sheets, timeline, vision
+from . import audio, fcpxml, plugins, sheets, timeline, vision
 from .config import LANGUAGE, PROFILE
 from .probe import probe
 
@@ -84,7 +84,7 @@ def analyze(args) -> None:
         _log(f"transcribing ({lang})…")
         vocab = Path(__file__).parent.parent / "vocab.txt"
         extra = vocab.read_text(encoding="utf-8").strip().replace("\n", ", ") if vocab.exists() else ""
-        base = tr.PROMPTS.get((args.profile, lang), "") if lang != "auto" else ""
+        base = plugins.profile(args.profile).get("prompts", {}).get(lang, "") if lang != "auto" else ""
         prompt = ", ".join(x for x in (base, extra) if x) or None
         segments = tr.transcribe(str(mic_wav), prompt=prompt, language=lang)
         _save(seg_path, segments)
@@ -101,11 +101,12 @@ def analyze(args) -> None:
     _log(f"transcript: {len(segments)} segments")
 
     _log("scanning picture…")
-    samples = vision.scan(src, info.width, info.height, layout, out / "thumbs")
-    if args.profile != "minecraft":
-        # HUD detectors (hearts, inventory panels, death screen) only mean something in Minecraft.
+    prof = plugins.profile(args.profile)
+    samples = vision.scan(src, info.width, info.height, layout, out / "thumbs", prof.get("hud"), prof.get("finish"))
+    if not prof.get("hud"):
+        # without a game profile there is no HUD to read, and a red screen isn't a death screen
         for smp in samples:
-            smp.update(heart_px=0, menu=0.0, redness=1.0, health=None)
+            smp.update(redness=1.0)
     _save(out / "vision.json", samples)
 
     tl = timeline.build(info.duration, speech, excite, game, segments, samples, sounds)
@@ -155,8 +156,8 @@ def main() -> None:
                    help="voice and game/music are mixed in one stream: split them with demucs first")
     a.add_argument("--speakers", help="label who speaks (diarization): auto or a number; needs hf_token")
     a.add_argument("--language", default=LANGUAGE, help="he | en | auto (default from ~/.mce/config.json)")
-    a.add_argument("--profile", default=PROFILE, choices=["general", "minecraft"],
-                   help="minecraft adds HUD detection (health, menus, death screen)")
+    a.add_argument("--profile", default=PROFILE, choices=["general", *plugins.profiles()],
+                   help="a game profile from an add-on in plugins/ (HUD detection, vocabulary)")
     a.set_defaults(fn=analyze)
 
     m = sub.add_parser("moment")

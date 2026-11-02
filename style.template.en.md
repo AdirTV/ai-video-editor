@@ -19,7 +19,6 @@ A living file. Claude reads it before every edit. Every correction you make is a
 ## Formats (examples — add your own)
 - **News/update short from a voiceover**: finished VO → shots following what's said → captions → CTA at the end.
 - **Long gaming video**: ~1 recorded hour ≈ 8 min; speed up travel/mining/building instead of cutting; cut menus and dead time.
-- **"Minecraft but…"**: see the minecraft-edit skill (milestones, gimmick, escalation, dragon).
 - **Talking head / podcast**: J/L cuts to smooth jump cuts, B-roll on every line that describes something.
 
 ## Markers (what Claude leaves for you)

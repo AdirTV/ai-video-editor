@@ -1,7 +1,7 @@
 """Keep every clip's level inside what Premiere accepts from XML.
 
 Premiere's FCP-XML import clamps the "Audio Levels" effect at +6 dB (and pops a "Translation Report"
-dialog). Quiet sources — Minecraft SFX, soft music intros — often need more. Instead of clip gain, such
+dialog). Quiet sources — game SFX, soft music intros — often need more. Instead of clip gain, such
 clips get a pre-boosted copy of their audio (32-bit float WAV, so the boost can't clip) and the clip gain
 drops by the same amount: same sound, no dialog.
 

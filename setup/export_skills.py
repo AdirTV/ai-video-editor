@@ -1,5 +1,5 @@
-"""Copy the live skills from ~/.claude/skills into the repo as machine-neutral
-templates (paths → placeholders). Run before committing skill changes.
+"""Copy the live skills from ~/.claude/skills into the repo (and add-ons' skills into plugins/<name>/skills/)
+as machine-neutral templates (paths → placeholders). Run before committing skill changes.
 
   python3 setup/export_skills.py
 """
@@ -13,8 +13,9 @@ HOME = Path.home()
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 from mce.config import EDITING_ROOT, SFX_LIB  # noqa: E402
+from mce.plugins import skill_dirs  # noqa: E402
 
-SKILLS = ["video-edit", "minecraft-edit", "sfx"]
+SKILLS = {name: REPO / "skills" / name for name in ("video-edit", "sfx")} | {d.name: d for d in skill_dirs()}
 
 
 def _home_form(p: Path) -> str:
@@ -33,8 +34,8 @@ if platform.system() == "Darwin":
     REPLACE += [("export PATH=/opt/homebrew/bin:$PATH; ", "{{PATH_PREFIX}}"),
                 ("export PATH=/opt/homebrew/bin:$PATH;", "{{PATH_PREFIX}}")]
 
-for name in SKILLS:
-    src, dst = HOME / ".claude" / "skills" / name, REPO / "skills" / name
+for name, dst in SKILLS.items():
+    src = HOME / ".claude" / "skills" / name
     # files that exist only in the repo copy would be lost by the rmtree below — bring them into the live skill first
     if dst.exists():
         for f in dst.rglob("*"):
@@ -42,7 +43,7 @@ for name in SKILLS:
             if f.is_file() and not live.exists():
                 live.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, live)
-                print(f"kept {f.relative_to(REPO)} (copied into the live skill)")
+                print(f"kept {f} (copied into the live skill)")
         shutil.rmtree(dst)
     shutil.copytree(src, dst)
     for f in dst.rglob("*.md"):
@@ -51,6 +52,6 @@ for name in SKILLS:
             text = text.replace(a, b)
         left = re.findall(r"(?:/Users/|/home/|[A-Z]:\\Users\\)[^\s`'\")]+", text)
         if left:
-            print(f"!! {f.relative_to(REPO)} still has machine paths: {left[:3]}")
+            print(f"!! {f} still has machine paths: {left[:3]}")
         f.write_text(text, encoding="utf-8")
     print("exported", name)

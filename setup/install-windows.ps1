@@ -1,8 +1,8 @@
 # AI video editor for Premiere — one-shot installer for Windows (PowerShell).
-# Run from the repo:  powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1 [-EditingRoot PATH] [-Language he|en|auto] [-NoMinecraft] [-ExportVia auto|ame|premiere] [-Yes]
+# Run from the repo:  powershell -ExecutionPolicy Bypass -File setup\install-windows.ps1 [-EditingRoot PATH] [-Language he|en|auto] [-ExportVia auto|ame|premiere] [-Yes]
 #   -Yes  never prompt (for an AI assistant running the install).
 #   Safe to re-run: finished steps are skipped or repeated harmlessly, and existing settings are kept.
-param([string]$EditingRoot = "", [string]$Language = "", [switch]$NoMinecraft, [string]$ExportVia = "", [switch]$Yes)
+param([string]$EditingRoot = "", [string]$Language = "", [string]$ExportVia = "", [switch]$Yes)
 $ErrorActionPreference = "Stop"
 # Native tools don't trip ErrorActionPreference: stop on a failed exit code ourselves
 function Native { & $args[0] @($args | Select-Object -Skip 1); if ($LASTEXITCODE) { throw "'$($args -join ' ')' failed (exit $LASTEXITCODE). Fix the error above and run the installer again - it is safe to re-run." } }
@@ -49,13 +49,13 @@ if (-not $ExportVia -and -not $Yes -and (Test-Path "$env:ProgramFiles\Adobe\Adob
   $A = Read-Host "Adobe Media Encoder found. Render exports there (Premiere stays free, and an export crash can't take it down)? [Y/n]"
   $ExportVia = if ($A -match '^[nN]') { "premiere" } else { "ame" }
 }
-Native uv run python setup\write_config.py --editing-root "$Er" --language "$Language" --minecraft $(if ($NoMinecraft) { "0" } else { "1" }) --export-via "$ExportVia"
+Native uv run python setup\write_config.py --editing-root "$Er" --language "$Language" --export-via "$ExportVia"
 if (-not (Test-Path style.md)) { if ($Language -eq "en") { Copy-Item style.template.en.md style.md } else { Copy-Item style.template.md style.md } }
 if (-not (Test-Path vocab.txt)) { New-Item vocab.txt | Out-Null }
 if (-not (Test-Path brand.json)) { Copy-Item brand.example.json brand.json }
 
 Step "6/8 Skills"
-if ($NoMinecraft) { Native uv run python setup\install_skills.py --skip minecraft-edit } else { Native uv run python setup\install_skills.py }
+Native uv run python setup\install_skills.py
 npx -y skills add remotion-dev/skills -g -a claude-code -y
 if ($LASTEXITCODE) { Write-Host "Remotion skills not installed (optional) - retry later with the same command" -ForegroundColor Yellow }
 

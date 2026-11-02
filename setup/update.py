@@ -5,6 +5,7 @@
 
 Double-click: update-mac.command (Mac) / update-windows.bat (Windows).
 Your personal files (style.md, vocab.txt, brand.json, remotion/src/projects/, media) are never touched.
+Add-ons in plugins/<name>/ that are git checkouts are pulled too.
 A ZIP install (no git) is turned into a git checkout on the first update, so later updates are one step.
 """
 import platform
@@ -157,6 +158,13 @@ if (restart_premiere or touched("panel/")) and cep.exists():
     for f in ("index.html", "styles.css"):
         shutil.copy2(REPO / "panel" / f, cep / f)
     restart_premiere = True
+
+# add-ons cloned into plugins/<name>/ (their own repos) update along with the editor
+for plug in sorted(p.parent for p in (REPO / "plugins").glob("*/.git")):
+    step(f"Add-on: {plug.name}")
+    r = subprocess.run(["git", "pull", "-q", "--ff-only"], cwd=plug, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    print("updated" if not r.returncode else f"⚠️  couldn't update it: {(r.stderr.strip().splitlines() or ['?'])[-1]}")
 
 step("Skills")
 run(sys.executable, str(REPO / "setup" / "install_skills.py"))

@@ -1,14 +1,17 @@
 """Write ~/.mce/config.json for the installers (Mac and Windows), keeping what's already there.
 
-  uv run python setup/write_config.py [--editing-root PATH] [--language he|en|auto] [--minecraft 1|0]
-                                       [--export-via auto|ame|premiere]
+  uv run python setup/write_config.py [--editing-root PATH] [--language he|en|auto] [--export-via auto|ame|premiere]
 
 Re-running the installer only changes what was asked for: an existing editing folder, hf_token or any other
 setting stays. Also creates the SFX library folders. Written as UTF-8 without a BOM on every OS.
 """
 import argparse
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from mce.plugins import sfx_kinds  # noqa: E402
 
 DEFAULT_ROOT = "~/Desktop/editing"
 SFX_KINDS = ["whoosh", "pop", "beep", "click", "shutter", "typing", "riser", "impact", "ding", "magic", "glitch"]
@@ -16,7 +19,6 @@ SFX_KINDS = ["whoosh", "pop", "beep", "click", "shutter", "typing", "riser", "im
 ap = argparse.ArgumentParser()
 ap.add_argument("--editing-root", default="")
 ap.add_argument("--language", default="")
-ap.add_argument("--minecraft", choices=["0", "1"], default="")
 ap.add_argument("--export-via", choices=["auto", "ame", "premiere"], default="",
                 help="render exports in Adobe Media Encoder (auto: when installed) or inside Premiere")
 a = ap.parse_args()
@@ -36,16 +38,14 @@ if a.editing_root or "sfx_lib" not in cfg:  # a moved editing folder takes its S
 cfg["editing_root"] = root
 cfg["language"] = a.language or cfg.get("language") or "auto"
 cfg.setdefault("profile", "general")
-if a.minecraft:
-    cfg["minecraft"] = a.minecraft == "1"
-cfg.setdefault("minecraft", True)
+cfg.pop("minecraft", None)  # setting from older installers; game layers are add-ons now (plugins/)
 if a.export_via:
     cfg["export_via"] = a.export_via
 cfg.setdefault("export_via", "auto")
 path.write_text(json.dumps(cfg, ensure_ascii=False, indent=1), encoding="utf-8")
 
 lib = Path(cfg["sfx_lib"]).expanduser()
-for k in SFX_KINDS + (["minecraft"] if cfg["minecraft"] else []):
+for k in SFX_KINDS + list(sfx_kinds()):
     (lib / k).mkdir(parents=True, exist_ok=True)
 print("settings:", path, "| editing folder:", Path(root).expanduser(), "| SFX library:", lib,
       "| exports:", {"auto": "Media Encoder when installed", "ame": "Media Encoder", "premiere": "inside Premiere"}

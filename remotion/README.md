@@ -11,13 +11,11 @@ src/
   captions/        Captions: word groups, karaoke, keyword colours, RTL/LTR from the text
   text/            BigText, Sticker, Alarm
   promo/           CTA, YouTubeCard
-  fx/              Morph, Frost, LightMeter, LottieFx
-  maps/            RouteMap, FlightMap
-  minecraft/       Advancement, ItemTooltip, SpeedrunTimer, YouDied
+  fx/              Morph, Frost, LottieFx
+  stream/          ChatMessage
   projects/        your own per-video graphics — gitignored, auto-loaded (see projects/README.md)
 public/
-  mc/              Minecraft icons, advancement frames, map pieces, fonts (shared)
-  core/            placeholders for previews (shared)
+  core/            placeholders for previews (shared); add-on assets are copied in next to it (local)
   brand/           your logo (local)
   lottie/          Lottie files fetched by `mce.lottie`; noto/ = emoji cache from `npm run emoji` (local)
   projects/<name>/ media for your own projects (local)
@@ -38,7 +36,8 @@ Colours, channel name, caption font and logo fall back to `brand.json` at the re
 
 A new shared component goes in the folder for its role, gets a schema + catalog entry in `src/schemas.ts` and a
 `<Composition>` in `Root.tsx` with neutral defaults; then `npm run catalog` refreshes CATALOG.md and
-`docs/gallery/`. Something built for a single video belongs in `src/projects/`. `npm run lint` checks the shared
-code (not `src/projects/`). `scripts/landgrid.mjs` rebuilds the FlightMap grid.
+`docs/gallery/`. Something built for a single video belongs in `src/projects/`; something for one game or format, in an add-on
+(`../plugins/<name>/remotion/`, see `plugins/README.md`). `npm run lint` checks the shared
+code (not `src/projects/`).
 
 Remotion is free for individuals and companies of up to 3 people; beyond that a [company license](https://remotion.pro) is needed.

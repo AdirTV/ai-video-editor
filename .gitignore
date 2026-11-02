@@ -9,8 +9,7 @@ brand.json
 # media and outputs never go in the repo
 remotion/public/*
 !remotion/public/.gitkeep
-# shared assets the components need (Minecraft icons/fonts, placeholders)
-!remotion/public/mc/
+# shared assets the components need (placeholders, emoji); add-on assets are copied in from plugins/
 !remotion/public/core/
 !remotion/public/lottie/
 # your own per-video graphics and their media stay local
@@ -25,3 +24,6 @@ remotion/out/
 test/
 # personal branding files (top-level only)
 /brand/
+# add-ons: each is its own folder (often its own repo), see plugins/README.md
+/plugins/*
+!/plugins/README.md

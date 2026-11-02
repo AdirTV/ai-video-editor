@@ -5,6 +5,7 @@
  * All configuration options: https://remotion.dev/docs/config
  */
 
+import path from "node:path";
 import { Config } from "@remotion/cli/config";
 
 Config.setRspack(true);
@@ -16,3 +17,8 @@ Config.setCodec("prores");
 Config.setProResProfile("4444");
 Config.setOverwriteOutput(true);
 Config.setDefaultPremountInSeconds(2);
+// Add-ons in ../plugins/<name>/remotion/ live outside this folder: let them find this folder's packages.
+Config.overrideBundlerConfig((c) => ({
+  ...c,
+  resolve: { ...c.resolve, modules: [path.resolve("node_modules"), "node_modules"] },
+}));

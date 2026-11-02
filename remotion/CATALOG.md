@@ -15,16 +15,8 @@ everything renders at 60 fps unless you set `REMOTION_FPS` (e.g. `REMOTION_FPS=3
 <a href="#alarm"><img src="docs/gallery/Alarm.jpg" height="160" alt="Alarm"></a>
 <a href="#morph"><img src="docs/gallery/Morph.jpg" height="160" alt="Morph"></a>
 <a href="#frost"><img src="docs/gallery/Frost.jpg" height="160" alt="Frost"></a>
-<a href="#lightmeter"><img src="docs/gallery/LightMeter.jpg" height="160" alt="LightMeter"></a>
 <a href="#lottiefx"><img src="docs/gallery/LottieFx.jpg" height="160" alt="LottieFx"></a>
 <a href="#youtubecard"><img src="docs/gallery/YouTubeCard.jpg" height="160" alt="YouTubeCard"></a>
-<a href="#youdied"><img src="docs/gallery/YouDied.jpg" height="160" alt="YouDied"></a>
-<a href="#advancement"><img src="docs/gallery/Advancement.jpg" height="160" alt="Advancement"></a>
-<a href="#advancementv"><img src="docs/gallery/AdvancementV.jpg" height="160" alt="AdvancementV"></a>
-<a href="#itemtooltip"><img src="docs/gallery/ItemTooltip.jpg" height="160" alt="ItemTooltip"></a>
-<a href="#speedruntimer"><img src="docs/gallery/SpeedrunTimer.jpg" height="160" alt="SpeedrunTimer"></a>
-<a href="#routemap"><img src="docs/gallery/RouteMap.jpg" height="160" alt="RouteMap"></a>
-<a href="#flightmap"><img src="docs/gallery/FlightMap.jpg" height="160" alt="FlightMap"></a>
 <a href="#wordcards"><img src="docs/gallery/WordCards.jpg" height="160" alt="WordCards"></a>
 <a href="#wordcardsv"><img src="docs/gallery/WordCardsV.jpg" height="160" alt="WordCardsV"></a>
 <a href="#chatmessage"><img src="docs/gallery/ChatMessage.jpg" height="160" alt="ChatMessage"></a>
@@ -32,7 +24,7 @@ everything renders at 60 fps unless you set `REMOTION_FPS` (e.g. `REMOTION_FPS=3
 ## Captions
 <img src="docs/gallery/Captions.jpg" align="right" width="180">
 
-Word-group captions: pop in/out, keyword colours, one line, RTL/LTR from the text. Looks: bold, stream, karaoke, mc.  
+Word-group captions: pop in/out, keyword colours, one line, RTL/LTR from the text. Looks: bold, stream, karaoke, hard.  
 `1080×1920` · 60 fps · component `Captions`
 
 | prop | type | required | notes |
@@ -41,8 +33,8 @@ Word-group captions: pop in/out, keyword colours, one line, RTL/LTR from the tex
 | `top` | number |  | Top of the caption line (px). Default 980 |
 | `size` | number |  | Font size (px); long groups shrink to stay on one line. Default 118 |
 | `seconds` | number |  | Length of the clip in seconds |
-| `font` | "rubik" \| "heebo" \| "carlito" \| "minecraft" |  | Default: brand.json captionFont, else rubik |
-| `look` | "bold" \| "stream" \| "karaoke" \| "mc" |  | Default: brand.json captionLook, else bold |
+| `font` | string |  | rubik \| heebo \| carlito, or a font an add-on registers (plugins/). Default: brand.json captionFont, else rubik |
+| `look` | "bold" \| "stream" \| "karaoke" \| "hard" |  | Default: brand.json captionLook, else bold |
 | `color` | string |  | Base text colour (highlights come from hl) |
 
 Example:
@@ -160,15 +152,15 @@ A turns into B behind a flash and a poof of square particles.
 
 | prop | type | required | notes |
 |---|---|---|---|
-| `from` | string | ✔ | Image it starts as — path relative to remotion/public/, e.g. "mc/Creeper.webp" or "projects/<name>/pic.png" |
-| `to` | string | ✔ | Image it turns into — path relative to remotion/public/, e.g. "mc/Axolotl.webp" or "projects/<name>/pic.png" |
+| `from` | string | ✔ | Image it starts as — path relative to remotion/public/, e.g. "core/shape-a.png" or "projects/<name>/pic.png" |
+| `to` | string | ✔ | Image it turns into — path relative to remotion/public/, e.g. "core/shape-b.png" or "projects/<name>/pic.png" |
 | `swapAtSec` | number |  | Second of the swap (hidden by a flash + particles). Default 0.38 |
 | `swapAt` | number |  | Deprecated: the swap as a frame number (old renders). Use swapAtSec |
 | `seconds` | number |  | Length of the clip in seconds. Default 1 |
 
 Example:
 ```bash
-npx remotion render Morph out.mov --props='{"from":"mc/Creeper.webp","to":"mc/Axolotl.webp","swapAtSec":0.38}'
+npx remotion render Morph out.mov --props='{"from":"core/shape-a.png","to":"core/shape-b.png","swapAtSec":0.38}'
 ```
 <br clear="right">
 
@@ -187,26 +179,6 @@ The screen freezes over from the edges.
 Example:
 ```bash
 npx remotion render Frost out.mov --props='{"grow":1.2,"tint":0.22,"seconds":2}'
-```
-<br clear="right">
-
-## LightMeter
-<img src="docs/gallery/LightMeter.jpg" align="right" width="180">
-
-Minecraft-style light-level meter that fills up and goes red.  
-`1080×1920` · 60 fps · component `LightMeter`
-
-| prop | type | required | notes |
-|---|---|---|---|
-| `seconds` | number |  | Length of the clip in seconds |
-| `label` | string |  |  |
-| `warn` | string |  |  |
-| `fill` | number |  | How full the meter gets. Default 0.9 |
-| `lang` | "he" \| "en" |  | Language of the built-in labels (default he) |
-
-Example:
-```bash
-npx remotion render LightMeter out.mov --props='{"label":"רמת אור","warn":"חזק מדי!","fill":0.9,"seconds":1.6}'
 ```
 <br clear="right">
 
@@ -257,156 +229,6 @@ npx remotion render YouTubeCard out.mov --props='{"seconds":4.58,"thumb":"core/t
 ```
 <br clear="right">
 
-## YouDied
-<img src="docs/gallery/YouDied.jpg" align="right" width="180">
-
-Minecraft death screen after a hit flash.  
-`1080×1920` · 60 fps · component `YouDied`
-
-| prop | type | required | notes |
-|---|---|---|---|
-| `seconds` | number |  | Length of the clip in seconds |
-
-Example:
-```bash
-npx remotion render YouDied out.mov --props='{"seconds":1.6}'
-```
-<br clear="right">
-
-## Advancement
-<img src="docs/gallery/Advancement.jpg" align="right" width="320">
-
-Minecraft "Advancement Made!" toast (landscape).  
-`1920×1080` · 60 fps · component `Advancement`
-
-| prop | type | required | notes |
-|---|---|---|---|
-| `seconds` | number |  | Length of the clip in seconds |
-| `title` | string |  | Default by frame: הישג חדש / מטרה הושגה / אתגר הושלם |
-| `text` | string | ✔ |  |
-| `icon` | string | ✔ | Icon — file name inside remotion/public/mc/ only (no folder), e.g. "Diamond.png" |
-| `frame` | "task" \| "goal" \| "challenge" |  | challenge = purple, the rare one |
-| `scale` | number |  |  |
-| `top` | number |  |  |
-| `side` | "right" \| "left" \| "center" |  |  |
-| `lang` | "he" \| "en" |  | Language of the built-in labels (default he) |
-
-Example:
-```bash
-npx remotion render Advancement out.mov --props='{"seconds":3,"text":"מצאת יהלומים","icon":"Diamond.png","frame":"challenge","scale":1}'
-```
-<br clear="right">
-
-## AdvancementV
-<img src="docs/gallery/AdvancementV.jpg" align="right" width="180">
-
-Same toast, placed for vertical video.  
-`1080×1920` · 60 fps · component `Advancement`
-
-| prop | type | required | notes |
-|---|---|---|---|
-| `seconds` | number |  | Length of the clip in seconds |
-| `title` | string |  | Default by frame: הישג חדש / מטרה הושגה / אתגר הושלם |
-| `text` | string | ✔ |  |
-| `icon` | string | ✔ | Icon — file name inside remotion/public/mc/ only (no folder), e.g. "Diamond.png" |
-| `frame` | "task" \| "goal" \| "challenge" |  | challenge = purple, the rare one |
-| `scale` | number |  |  |
-| `top` | number |  |  |
-| `side` | "right" \| "left" \| "center" |  |  |
-| `lang` | "he" \| "en" |  | Language of the built-in labels (default he) |
-
-Example:
-```bash
-npx remotion render AdvancementV out.mov --props='{"seconds":3,"text":"נסעת בעגלה","icon":"Minecart.png","frame":"task","scale":0.8,"top":260,"side":"center"}'
-```
-<br clear="right">
-
-## ItemTooltip
-<img src="docs/gallery/ItemTooltip.jpg" align="right" width="180">
-
-Minecraft item tooltip used as a price tag; numbers roll up.  
-`1080×1920` · 60 fps · component `ItemTooltip`
-
-| prop | type | required | notes |
-|---|---|---|---|
-| `seconds` | number |  | Length of the clip in seconds |
-| `lines` | { text, color, count, prefix, suffix, at }[] | ✔ |  |
-| `top` | number |  |  |
-| `scale` | number |  |  |
-| `tilt` | number |  |  |
-
-Example:
-```bash
-npx remotion render ItemTooltip out.mov --props='{"seconds":3,"lines":[{"text":"חרב יהלום"},{"text":"","count":120,"prefix":"₪","color":"#FFAA00","at":0.3}]}'
-```
-<br clear="right">
-
-## SpeedrunTimer
-<img src="docs/gallery/SpeedrunTimer.jpg" align="right" width="320">
-
-LiveSplit-style speedrun timer with splits.  
-`1920×1080` · 60 fps · component `SpeedrunTimer`
-
-| prop | type | required | notes |
-|---|---|---|---|
-| `seconds` | number |  | Length of the clip in seconds |
-| `title` | string |  |  |
-| `category` | string |  | e.g. "Any%" |
-| `splits` | { label, at }[] | ✔ |  |
-| `from` | number | ✔ | Run clock at the start of the clip (s) |
-| `to` | number | ✔ | Run clock at the end (s) — a short clip can cover a long run |
-| `scale` | number |  |  |
-| `corner` | "tl" \| "tr" |  |  |
-
-Example:
-```bash
-npx remotion render SpeedrunTimer out.mov --props='{"seconds":6,"from":0,"to":600,"scale":0.9,"splits":[{"label":"התחלה","at":0},{"label":"ברזל","at":140},{"label":"נת'ר","at":380},{"label":"סוף","at":600}]}'
-```
-<br clear="right">
-
-## RouteMap
-<img src="docs/gallery/RouteMap.jpg" align="right" width="320">
-
-Minecraft filled map that unfolds; a route draws stop to stop.  
-`1920×1080` · 60 fps · component `RouteMap`
-
-| prop | type | required | notes |
-|---|---|---|---|
-| `seconds` | number |  | Length of the clip in seconds |
-| `stops` | { x, y, label, icon }[] | ✔ | Positions 0..1 inside the map |
-| `upTo` | number |  | Legs to draw (bring the same map back later showing more) |
-| `fromLeg` | number |  |  |
-| `size` | number |  |  |
-
-Example:
-```bash
-npx remotion render RouteMap out.mov --props='{"seconds":5,"size":900,"stops":[{"x":0.15,"y":0.2,"label":"בית"},{"x":0.4,"y":0.5,"label":"תחנה","icon":"Minecart.png"},{"x":0.82,"y":0.82,"label":"יעד"}]}'
-```
-<br clear="right">
-
-## FlightMap
-<img src="docs/gallery/FlightMap.jpg" align="right" width="180">
-
-Pixel world map with a flight arc and a km counter.  
-`1080×1920` · 60 fps · component `FlightMap`
-
-| prop | type | required | notes |
-|---|---|---|---|
-| `seconds` | number |  | Length of the clip in seconds |
-| `size` | number |  |  |
-| `top` | number |  |  |
-| `from` | { lon, lat, label } |  | Default Israel |
-| `to` | { lon, lat, label } |  | Default Japan |
-| `km` | number |  | Distance counter |
-| `unit` | string |  | Unit after the counter. Default by lang: "ק״מ" / "km" |
-| `lang` | "he" \| "en" |  | Language of the built-in labels (default he) |
-
-Example:
-```bash
-npx remotion render FlightMap out.mov --props='{"seconds":2.6}'
-```
-<br clear="right">
-
 ## WordCards
 <img src="docs/gallery/WordCards.jpg" align="right" width="320">
 
@@ -425,7 +247,7 @@ Documentary kinetic-type opener: base line + huge keyword + handwritten line per
 
 Example:
 ```bash
-npx remotion render WordCards out.mov --props='{"cards":[{"base":"כמה","script":"חברים","baseAt":0.1,"scriptAt":0.35,"scriptGlow":true,"end":1.1},{"base":"עולם","keyword":"מיינקראפט","script":"אחד","icon":"mc/Diamond.png","iconSide":"right","baseAt":1.15,"keywordAt":1.5,"scriptAt":1.9,"end":2.6},{"base":"ואז הבית","keyword":"התפוצץ","keyColor":"#FF5A1F","glitch":true,"baseAt":2.7,"keywordAt":3,"end":4},{"base":"זה התחיל כמו","keyword":"סרבייבל","script":"רגיל","theme":"cream","baseAt":4.1,"keywordAt":4.4,"scriptAt":4.8,"end":5.6}]}'
+npx remotion render WordCards out.mov --props='{"cards":[{"base":"כמה","script":"חברים","baseAt":0.1,"scriptAt":0.35,"scriptGlow":true,"end":1.1},{"base":"עולם","keyword":"שלם","script":"אחד","icon":"core/shape-a.png","iconSide":"right","baseAt":1.15,"keywordAt":1.5,"scriptAt":1.9,"end":2.6},{"base":"ואז הבית","keyword":"התפוצץ","keyColor":"#FF5A1F","glitch":true,"baseAt":2.7,"keywordAt":3,"end":4},{"base":"זה התחיל כמו","keyword":"סרבייבל","script":"רגיל","theme":"cream","baseAt":4.1,"keywordAt":4.4,"scriptAt":4.8,"end":5.6}]}'
 ```
 <br clear="right">
 
@@ -447,7 +269,7 @@ Same cards, laid out for vertical video.
 
 Example:
 ```bash
-npx remotion render WordCardsV out.mov --props='{"cards":[{"base":"כמה","script":"חברים","baseAt":0.1,"scriptAt":0.35,"scriptGlow":true,"end":1.1},{"base":"עולם","keyword":"מיינקראפט","script":"אחד","icon":"mc/Diamond.png","iconSide":"right","baseAt":1.15,"keywordAt":1.5,"scriptAt":1.9,"end":2.6},{"base":"ואז הבית","keyword":"התפוצץ","keyColor":"#FF5A1F","glitch":true,"baseAt":2.7,"keywordAt":3,"end":4},{"base":"זה התחיל כמו","keyword":"סרבייבל","script":"רגיל","theme":"cream","baseAt":4.1,"keywordAt":4.4,"scriptAt":4.8,"end":5.6}]}'
+npx remotion render WordCardsV out.mov --props='{"cards":[{"base":"כמה","script":"חברים","baseAt":0.1,"scriptAt":0.35,"scriptGlow":true,"end":1.1},{"base":"עולם","keyword":"שלם","script":"אחד","icon":"core/shape-a.png","iconSide":"right","baseAt":1.15,"keywordAt":1.5,"scriptAt":1.9,"end":2.6},{"base":"ואז הבית","keyword":"התפוצץ","keyColor":"#FF5A1F","glitch":true,"baseAt":2.7,"keywordAt":3,"end":4},{"base":"זה התחיל כמו","keyword":"סרבייבל","script":"רגיל","theme":"cream","baseAt":4.1,"keywordAt":4.4,"scriptAt":4.8,"end":5.6}]}'
 ```
 <br clear="right">
 

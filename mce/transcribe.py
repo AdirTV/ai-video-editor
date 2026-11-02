@@ -17,15 +17,6 @@ DEFAULT_MODEL = "large-v3-turbo"
 MLX_MODELS = {"he": "mlx-community/ivrit-ai-whisper-large-v3-turbo-mlx"}
 MLX_DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
 
-# Prime the decoder with spellings it should prefer (game-specific profiles only).
-PROMPTS = {
-    ("minecraft", "he"): "מיינקראפט, קריפר, אנדרמן, אנדר דרגון, הנדר, בלייז, פנינת אנדר, סטרונגהולד, "
-                         "יהלומים, נתריט, מגן, חרב, קשת, פורטל, ספאון, סרבייבל",
-    ("minecraft", "en"): "Minecraft, Creeper, Enderman, Ender Dragon, Nether, Blaze, Ender Pearl, Stronghold, "
-                         "diamonds, Netherite, shield, sword, bow, portal, spawn, survival",
-}
-DEFAULT_PROMPT = PROMPTS.get((PROFILE, "he"), "")  # kept for older callers
-
 LAST_LANGUAGE = None  # language of the most recent transcription
 
 
@@ -137,8 +128,9 @@ def transcribe(wav_path: str, prompt: str | None = None, batch_size: int = 8,
     lang = (language or LANGUAGE or "auto").lower()
     if lang == "auto" and not _use_mlx():
         lang = detect_language(audio)
-    if prompt is None:
-        prompt = PROMPTS.get((PROFILE, lang), "")
+    if prompt is None:  # words that prime the decoder, from the add-on profile (if any)
+        from .plugins import profile
+        prompt = profile(PROFILE).get("prompts", {}).get(lang, "")
 
     if _use_mlx():
         raw, lang = _asr_mlx(wav_path, lang, prompt)

@@ -3,7 +3,7 @@ import { clamp, popOpacity, popScale } from "../pop";
 import type { Props } from "../schemas";
 
 
-// One mob turns into another: A pops in and wobbles, a flash + Minecraft
+// One image turns into another: A pops in and wobbles, a flash + a pixel
 // "poof" of square particles hides the swap at `swapAtSec`, then B pops out of it.
 // `swapAt` (a frame number) is the old prop, still honoured so earlier renders don't change.
 export const Morph: React.FC<Props<"Morph">> = ({ from, to, swapAtSec = 0.38, swapAt: swapAtFrame }) => {

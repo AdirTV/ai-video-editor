@@ -26,7 +26,7 @@ def _runs(flags: list[bool], ts: list[float], min_len: float) -> list[tuple[floa
 
 def build(duration: float, speech, excite, game, segments, samples, sounds=()) -> dict:
     ts = [s["t"] for s in samples]
-    menus = _runs([s["menu"] > 0.25 for s in samples], ts, 1.0)
+    menus = _runs([s.get("menu", 0) > 0.25 for s in samples], ts, 1.0)
     deaths = _runs([s["redness"] > 1.8 and s["brightness"] > 30 for s in samples], ts, 1.0)
 
     speaking = np.zeros(int(duration) + 2, bool)
@@ -34,7 +34,7 @@ def build(duration: float, speech, excite, game, segments, samples, sounds=()) -
         speaking[int(s): int(e) + 1] = True
     idle = _runs([s["motion"] < 1.0 and not speaking[int(s["t"])] for s in samples], ts, 6.0)
 
-    health = [(s["t"], s["health"]) for s in samples if s.get("health") is not None and s["menu"] < 0.15]
+    health = [(s["t"], s["health"]) for s in samples if s.get("health") is not None and s.get("menu", 0) < 0.15]
     drops = []
     for i, (t, h) in enumerate(health):
         j = i

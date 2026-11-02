@@ -13,9 +13,9 @@ markers, reports) follows what is spoken in it — the tools detect it (`mce.i18
 `language` in `~/.mce/config.json` ("he" | "en" | "auto"). Graphics pick text direction from the text itself
 (Hebrew → RTL, English → LTR); components with built-in words take `lang: "en" | "he"`.
 
-**Format profiles:** most edits are `general`. Format-specific skills add their own signals and structure —
-e.g. `minecraft-edit` (HUD health/menus/death, milestones, "Minecraft but…"). If the footage is a game or a
-format with its own skill, load that skill too.
+**Format profiles:** most edits are `general`. Add-ons in `{{MCE_HOME}}/plugins/` can bring a game or format
+its own skill, signals (`--profile <name>`) and graphics. If the footage is a game or a format with its own
+skill, load that skill too.
 
 **The creator's taste comes first.** Read `{{MCE_HOME}}/style.md` before every edit — it is this creator's own
 style (formats, pacing, caption look, framing, music sources, everything they corrected before) and its
@@ -130,7 +130,7 @@ sequence without pushing: `uv run python -m mce.export <out.mp4> [--sequence NAM
   Render: `npx remotion render <Comp> out.mov --props='<json>'` — transparent ProRes 4444 is the default, no
   flags needed. Everything renders at 60 fps; `REMOTION_FPS=30 npx remotion render …` for a 30 fps edit.
   Give re-renders NEW filenames (Premiere caches by path). Premiere SRT captions: avoid (small, RTL number bugs).
-  Layout: shared components by role in `src/{captions,text,promo,fx,maps,minecraft}/`; a graphic made for ONE
+  Layout: shared components by role in `src/{captions,text,promo,fx,stream}/` (add-ons register more); a graphic made for ONE
   video goes in `src/projects/<name>/index.tsx` (exports `Compositions`, auto-loaded) with media in
   `public/projects/<name>/` — both gitignored. Only move something into the shared folders when another creator
   would genuinely use it; then add its schema in `src/schemas.ts`, register it in `Root.tsx` with neutral

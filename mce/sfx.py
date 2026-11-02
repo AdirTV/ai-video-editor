@@ -1,7 +1,7 @@
 """Sound-effect library + automatic placement on a timeline spec.
 
 Library: category folders (whoosh, pop, riser, impact, ding, click, magic, glitch,
-minecraft, meme) plus whole packs (e.g. "Jota Pack/"), classified by filename
+meme, plus kinds add-ons add) plus whole packs (e.g. "Jota Pack/"), classified by filename
 keywords first, then folder names.
 
   uv run python -m mce.sfx index [LIB]          scan → LIB/sfx_index.json
@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import ff
+from . import ff, plugins
 from .config import SFX_LIB as LIB
 AUDIO_EXT = {".wav", ".mp3", ".m4a", ".aif", ".aiff", ".ogg", ".flac"}
 
@@ -47,24 +47,31 @@ FOLDERS = {
     "cinematic": "impact", "notification": "ding", "chime": "ding", "bell": "ding", "positive": "ding",
     "button": "click", "switch": "click", "game ui": "click", "beep": "beep", "typing": "typing",
     "keyboard": "typing", "camera": "shutter", "hacking": "glitch",
-    "sci-fi": "glitch", "sci_fi": "glitch", "minecraft": "minecraft", "funny": "meme",
+    "sci-fi": "glitch", "sci_fi": "glitch", "funny": "meme",
     "ed edd eddy": "meme", "anime": "meme", "negative": "meme", "pop": "pop", "magic": "magic", "glitch": "glitch",
     "ding": "ding",
 }
 # Target loudness (dBFS RMS around the peak) per kind; the voiceover sits near -16.
 LEVEL = {"typing": -28, "shutter": -25, "beep": -26, "whoosh": -26, "pop": -24, "riser": -27, "impact": -22, "ding": -25, "click": -26, "magic": -25,
-         "glitch": -27, "minecraft": -24, "meme": -22, "other": -25}
+         "glitch": -27, "meme": -22, "other": -25}
 # Longest sound worth using per kind (seconds); long beds/loops are skipped.
 MAX_LEN = {"typing": 3, "shutter": 1.5, "beep": 1.0, "whoosh": 3, "pop": 1.5, "click": 1.5, "ding": 3, "impact": 5, "riser": 8, "magic": 4,
-           "glitch": 3, "minecraft": 5, "meme": 6, "other": 6}
+           "glitch": 3, "meme": 6, "other": 6}
+# Kinds an add-on adds (e.g. a game's own sounds): their folders win over filename keywords,
+# since game sounds ("zombie/hit1") are not generic impacts.
+PACK_FOLDERS = {}
+for _kind, _k in plugins.sfx_kinds().items():
+    PACK_FOLDERS[_k["folder"].lower()] = _kind
+    LEVEL[_kind], MAX_LEN[_kind] = _k.get("level", -25), _k.get("max_len", 6)
 
 
 def _category(path: Path, lib: Path) -> str:
     """Filename keywords first (most specific), then folder names, else "other"."""
     name = path.stem.lower().replace("_", " ")
     parts = [p.lower() for p in (path.relative_to(lib).parts[:-1] if path.is_relative_to(lib) else ())]
-    if any("minecraft" in p for p in parts):
-        return "minecraft"  # game sounds ("zombie/hit1") are not generic impacts
+    for key, kind in PACK_FOLDERS.items():
+        if any(key in p for p in parts):
+            return kind
     for kind, words in KEYWORDS.items():
         if any(w in name for w in words):
             return kind

@@ -16,7 +16,7 @@ transitions, captions, graphics, music and sound effects, and render a check.
 | **Premiere bridge** | [premiere-pro-mcp](https://github.com/leancoderkavy/premiere-pro-mcp) (open source, MIT) + a redesigned panel inside Premiere |
 | **Editing tools** (`mce/`) | transcription in English/Hebrew/any language (auto-detected), recording analysis (laughs, screams, strongest moments), forced alignment of scripts, sequence builders, J/L cuts, automatic sound effects, music (smart starts/endings, drops on cue, crossfades between songs), loudness, quality checks, voice/music/game separation (Demucs), speaker labels, shot detection (PySceneDetect), subject cutouts for text-behind-subject (SAM 2), retake detection with best-take picks (Hebrew and English), voice diagnosis and clean-up matched to the problem, B-roll search and download |
 | **Graphics** (`remotion/`) | animated captions, CTAs, pop-up graphics, Lottie animations and animated emoji — built in Remotion and layered into Premiere with transparency; text direction follows the language |
-| **Skills** (`skills/`) | what teaches Claude how to edit: `video-edit` (general), `minecraft-edit` (Minecraft layer), `sfx` (sound effects) |
+| **Skills** (`skills/`) | what teaches Claude how to edit: `video-edit` (general), `sfx` (sound effects) |
 
 ## Requirements
 - Mac (Apple Silicon) or Windows 10/11
@@ -60,9 +60,9 @@ powershell -ExecutionPolicy Bypass -File $HOME\ai-video-editor\setup\install-win
    - "Add sound effects"
 4. **Notes:** instead of explaining in chat, drop markers with comments on the Premiere timeline and say "read my notes".
 
-## Not making Minecraft videos?
-The editor is general. The Minecraft layer only activates for Minecraft footage, and you can leave it out
-entirely at install: `--no-minecraft` (Mac) or `-NoMinecraft` (Windows). If Claude installs it, it will ask.
+## Add-ons
+The editor can be extended for one kind of video (a game, a format) with an add-on in `plugins/` — its own
+skills, graphics and tools, without being part of this repo. See [plugins/README.md](plugins/README.md).
 
 ## Language
 Chosen at install: English / Hebrew / auto (`language` in `~/.mce/config.json`). In auto mode the language is
@@ -71,7 +71,7 @@ large-v3-turbo. Captions and graphics lay out left-to-right or right-to-left fro
 
 ## Sound effects
 The library isn't in the repo (it's huge and everyone has their own). The installer creates an `SFX` folder in
-your editing folder with `whoosh pop beep click shutter typing riser impact ding magic glitch minecraft` subfolders (`minecraft` only with the Minecraft layer). Drop sounds in
+your editing folder with `whoosh pop beep click shutter typing riser impact ding magic glitch` subfolders. Drop sounds in
 (or a whole pack into `SFX/`) and tell Claude "index the SFX library".
 
 ## Your style

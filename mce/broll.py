@@ -1,6 +1,6 @@
 """B-roll: find footage for what's being said, pull just the part you need, check it's the right shot.
 
-  uv run python -m mce.broll search "minecraft pointed dripstone" [--n 8]
+  uv run python -m mce.broll search "volcano eruption" [--n 8]
       → YouTube results: id, channel, length, views, title (official channels first: pick from those)
   uv run python -m mce.broll scan <url|id> [--n 24]
       → a low-res copy of the whole video + a frame sheet across its length: find WHERE the shot is

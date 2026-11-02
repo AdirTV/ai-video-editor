@@ -18,7 +18,7 @@ Talk to the user in the language they write in.
 - **Packs** — any sound pack dropped into the library as its own folder is indexed too: used as fallback for
   kinds with no curated sounds, and for specific picks (`search`). Look at the library's top-level folders to
   see which packs this user has.
-- `minecraft`/`meme` kinds come from packs (game sounds — only relevant for Minecraft videos —, vine-boom style memes).
+- `meme` comes from packs (vine-boom style memes); add-ons can add kinds of their own (e.g. a game's sounds).
 
 Commands (from `{{MCE_HOME}}`):
 - `uv run python -m mce.sfx index` — scan the library (parallel; only new/changed files are analyzed). Writes
@@ -30,7 +30,7 @@ Commands (from `{{MCE_HOME}}`):
 - `uv run python -m mce.sfx starter` — rebuild the curated kit from the packs (only if the user asks; it
   replaces what they curated — never run it over their own picks without asking).
 
-Classification: Minecraft folders → `minecraft`; then filename keywords; then folder names; else `other`.
+Classification: an add-on kind's folders first; then filename keywords; then folder names; else `other`.
 
 ## What sound goes where (rules from a pro editor — follow them)
 
@@ -42,7 +42,7 @@ Classification: Minecraft folders → `minecraft`; then filename keywords; then 
 | Highlighting something | **sparkle** (magic/shimmer/glitter reveal) | clip `"emphasis": true` (`"emphasis_at"` s into the clip) |
 | Text appearing | **ASMR typing** for as long as it types on | clip `"text": true` (`"text_dur"` seconds) — generated from single keystrokes in `typing/` |
 
-Kinds in the library: whoosh, pop, beep, click, shutter, typing, riser, impact, ding, magic, glitch (+ minecraft, meme).
+Kinds in the library: whoosh, pop, beep, click, shutter, typing, riser, impact, ding, magic, glitch (+ meme, + add-on kinds).
 
 ## Placing sounds on an edit
 
@@ -53,7 +53,7 @@ Works on a `mce.timeline_xml` spec (see the video-edit skill). Mark intent on th
 - clip `"sfx": "<kind>"` (+ optional `"sfx_at"` seconds into the clip, `"sfx_align": "start"`)
   → e.g. `impact` on a big "2027", `magic` at a transformation's swap frame, `ding` on a CTA.
 - top-level `"sfx": [{"t": 2.417, "kind": "riser"}]` → explicit hits; add `"file": "<path>"` to force a
-  specific sound (e.g. the Minecraft rabbit sound from `search`) (a riser peaking on the
+  specific sound (e.g. a specific game sound from `search`) (a riser peaking on the
   hook's payoff cut is the classic).
 
 Then either set `"auto_sfx": true` and run `uv run python -m mce.push <spec.json> --export …`

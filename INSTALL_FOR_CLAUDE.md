@@ -9,9 +9,7 @@ dump command output on them.
   a chat-only Claude without a terminal, tell the user to open Claude Code and paste the link there.
 - Ask the user two questions: **where do they keep their editing projects?** (default: `~/Desktop/editing`
   on Mac, `%USERPROFILE%\Desktop\editing` on Windows), and **which language their videos are in** —
-  Hebrew (`he`), English (`en`) or mixed/other (`auto`, detected per video). Also ask whether they make
-  **Minecraft** videos — if not, add `--no-minecraft` (Mac) / `-NoMinecraft` (Windows) so only the general
-  editor is installed. If **Adobe Media Encoder** is installed (Mac: `ls -d "/Applications/Adobe Media Encoder"*`,
+  Hebrew (`he`), English (`en`) or mixed/other (`auto`, detected per video). If **Adobe Media Encoder** is installed (Mac: `ls -d "/Applications/Adobe Media Encoder"*`,
   Windows: `Test-Path "$env:ProgramFiles\Adobe\Adobe Media Encoder*"`), ask whether exports should render
   there — Premiere stays free during a render and an export crash can't take it (and unsaved work) down;
   recommended — and pass `--export-via ame` or `--export-via premiere` (Windows: `-ExportVia ame|premiere`).
@@ -42,7 +40,7 @@ and keeps existing settings (`~/.mce/config.json`).
 The installer is long (several minutes, downloads ~2 GB of Python/Node packages). Run it in the
 background or with a long timeout and report progress per step (it prints `== n/8 ...`).
 It installs: ffmpeg, Node, uv, yt-dlp, the Premiere bridge (premiere-pro-mcp) and its panel, the Python
-and Remotion dependencies, the skills (`video-edit`, `sfx`, Remotion's, and `minecraft-edit` unless `--no-minecraft`), and registers the
+and Remotion dependencies, the skills (`video-edit`, `sfx`, Remotion's), and registers the
 `premiere` MCP server with Claude Code.
 
 ## 3. Verify
@@ -59,7 +57,7 @@ in `remotion/public/brand/` with `"logo": "brand/<file>"`. The graphics use thes
 2. **Restart Premiere Pro**, then **Window → Extensions → MCP for Adobe Premiere Pro** → make sure it
    says the connector is running (press Start if needed).
 3. Optional: put sound effects into `<editing folder>/SFX/<kind>/` (whoosh, pop, beep, click, shutter,
-   typing, riser, impact, ding, magic, glitch, minecraft) and ask Claude to "index the SFX library".
+   typing, riser, impact, ding, magic, glitch) and ask Claude to "index the SFX library".
 
 Then tell them how to use it, in their language, e.g. open Claude Code in a project folder and say:
 "edit this recording into an 8-minute video", "make a short from this voiceover with this clip behind it",
