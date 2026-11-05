@@ -100,4 +100,6 @@ def url_to_path(url: str, windows: bool | None = None) -> str:
         p = p[1:]
     if windows or re.match(r"^/[A-Za-z]:[/\\]", p):
         return str(PureWindowsPath(p.lstrip("/")))
+    if os.name == "nt":  # a Mac path read on Windows: resolving would turn it into C:\Users\…
+        return str(PurePosixPath(p))
     return str(Path(p).resolve())
