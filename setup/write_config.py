@@ -11,9 +11,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from mce.config import editing_root  # noqa: E402
 from mce.plugins import sfx_kinds  # noqa: E402
 
-DEFAULT_ROOT = "~/Desktop/editing"
 SFX_KINDS = ["whoosh", "pop", "beep", "click", "shutter", "typing", "riser", "impact", "ding", "magic", "glitch"]
 
 ap = argparse.ArgumentParser()
@@ -32,8 +32,10 @@ except json.JSONDecodeError:
     print(f"⚠️  {path} was unreadable; kept a copy as config.broken.json and started fresh")
     cfg = {}
 
-root = a.editing_root or cfg.get("editing_root") or DEFAULT_ROOT
-if a.editing_root or "sfx_lib" not in cfg:  # a moved editing folder takes its SFX library along
+# absolute, and the real Desktop (OneDrive-redirected on many Windows PCs) when none was chosen
+root = str(editing_root(a.editing_root or cfg.get("editing_root")))
+old_sfx = str(cfg.get("sfx_lib", "")).replace("\\", "/") == "~/Desktop/editing/SFX"  # older installers' default
+if a.editing_root or "sfx_lib" not in cfg or old_sfx:  # a moved editing folder takes its SFX library along
     cfg["sfx_lib"] = str(Path(root) / "SFX")
 cfg["editing_root"] = root
 cfg["language"] = a.language or cfg.get("language") or "auto"

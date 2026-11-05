@@ -109,5 +109,7 @@ install turns into a git checkout on its first update. Claude also checks for up
 ## Troubleshooting
 - **"heartbeat is stale"** — the MCP panel in Premiere is closed or stuck: Window → Extensions → MCP for Adobe Premiere Pro.
 - **After a premiere-pro-mcp update the panel looks old again** — `bash panel/install.sh` (Mac) or re-run `install-windows.bat` (Windows).
-- **Windows** — the tools were developed on Mac and handle Windows paths, Hebrew text and settings files, but get less testing there. If something breaks, open a GitHub issue with the error; `uv run python setup/doctor.py` shows what's missing.
+- **Windows** — the tools were developed on Mac and handle Windows paths, Hebrew text and settings files, but get less testing there. If something breaks, open a GitHub issue with the error and the install log (`%LOCALAPPDATA%\mce\logs`); `uv run python setup/doctor.py` shows what's missing.
+- **Windows: winget blocked or missing** — the installer only installs what's missing, and without winget it prints the official download for each tool. Install from there, open a new PowerShell window and run the installer again. (An AI agent running the installer in a sandbox is often blocked from winget — run it in a normal PowerShell window instead.)
+- **Windows: Desktop in OneDrive** — the default editing folder is `editing` on the real Desktop (often `OneDrive\Desktop`). Large video projects there sync to the cloud; pick another folder during install or with `-EditingRoot`.
 - **The installer stopped halfway** — fix what the message says and run it again. It's safe: finished parts aren't broken and settings are kept.

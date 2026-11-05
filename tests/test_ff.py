@@ -1,4 +1,6 @@
+import os
 from fractions import Fraction
+from pathlib import Path
 
 import pytest
 
@@ -42,12 +44,25 @@ def test_windows_url_written_by_premiere():
     assert ff.url_to_path(url, windows=True) == r"C:\Users\adir\Desktop\שלום.mp4"
 
 
-def test_mac_path_roundtrip(tmp_path):
-    p = tmp_path / "עריכה" / "clip 1.mp4"
-    url = ff.pathurl(str(p), windows=False)
+@pytest.mark.parametrize("path", [
+    "/Users/adir/Desktop/עריכה/clip 1.mp4",
+    "/Volumes/Media Drive/clip #1 (final).mov",
+])
+def test_mac_path_roundtrip(path):
+    # explicit POSIX paths: a tmp_path would be a Windows path when the tests run on Windows
+    url = ff.pathurl(path, windows=False)
     assert url.startswith("file:///")
-    assert ff.url_to_path(url, windows=False) == str(p.resolve())
-    assert ff.url_to_path(url.replace("file:///", "file://localhost/"), windows=False) == str(p.resolve())
+    assert "%5C" not in url
+    want = path if os.name == "nt" else str(Path(path).resolve())
+    assert ff.url_to_path(url, windows=False) == want
+    assert ff.url_to_path(url.replace("file:///", "file://localhost/"), windows=False) == want
+
+
+def test_onedrive_path_roundtrip():
+    path = r"C:\Users\adirg\OneDrive\Desktop\editing\פרויקט חדש\cam 1.mp4"
+    url = ff.pathurl(path, windows=True)
+    assert url.startswith("file://localhost/C%3A/Users/adirg/OneDrive/Desktop/")
+    assert ff.url_to_path(url, windows=True) == path
 
 
 def test_run_reports_missing_binary():

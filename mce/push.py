@@ -38,8 +38,22 @@ def _ok(res: str) -> bool:
         d = json.loads(res)
     except json.JSONDecodeError:
         return False
+    if not isinstance(d, dict):
+        return False
     d = d.get("data", d)
-    return bool(d.get("verified") or d.get("outcome") == "verified" or d.get("imported") or d.get("deleted"))
+    return isinstance(d, dict) and bool(d.get("verified") or d.get("outcome") == "verified" or d.get("imported") or d.get("deleted"))
+
+
+def _data(res: str, what: str):
+    """A bridge reply as JSON (its "data" when wrapped). A reply that isn't JSON is an error message
+    from Premiere or the bridge: stop with it instead of a JSONDecodeError further down."""
+    try:
+        d = json.loads(res)
+    except json.JSONDecodeError:
+        raise SystemExit(f"✗ {what} failed — Premiere answered:\n  {str(res)[:500]}") from None
+    if isinstance(d, dict) and d.get("success") is False:  # the bridge's JSON error: {"success": false, "error": …}
+        raise SystemExit(f"✗ {what} failed — Premiere answered:\n  {d.get('error') or str(res)[:500]}")
+    return d.get("data", d) if isinstance(d, dict) else d
 
 
 GROUP_STEPS = ("vo", "music", "sfx")
@@ -121,11 +135,19 @@ def assign_ids(spec: dict) -> bool:
 
 def push(spec_path: str, export: str | None = None, keep_edits: bool = True, force: bool = False,
          export_direct: bool = False) -> None:
+    # absolute up front: the XML path goes to Premiere, whose working directory isn't ours
+    spec_path = str(Path(spec_path).resolve())
+    if not Path(spec_path).is_file():
+        raise SystemExit(f"spec not found: {spec_path}")
     c = Client()
     try:
-        def call(tool, args, label):
+        def call(tool, args, label, required=False):
             res = c.call(tool, args)
-            print(("✓ " if _ok(res) else "✗ ") + label + ("" if _ok(res) else f"  → {res[:200]}"))
+            ok = _ok(res)
+            print(("✓ " if ok else "✗ ") + label + ("" if ok else f"  → {res[:200]}"))
+            if required and not ok:
+                # later steps work on what this one made: don't run them on a missing/old sequence
+                raise SystemExit(f"stopping: '{label}' failed — Premiere answered:\n  {res[:500]}")
             return res
 
         spec = json.loads(Path(spec_path).read_text(encoding="utf-8"))
@@ -157,6 +179,8 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
         built = copy.deepcopy(spec)  # before headroom boosts swap files: what pull compares against
         xml = Path(spec_path).with_suffix(".xml")
         xml.write_text(build(spec), encoding="utf-8")
+        if not xml.is_file():
+            raise SystemExit(f"timeline XML wasn't written: {xml}")
         replaces = spec.get("replaces")
         try:  # an older sequence with the same name would be the one activated and exported
             seqs = json.loads(c.call("list_sequences", {}))
@@ -175,19 +199,19 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
             pass
         import time
         t_import = time.time()
-        call("import_fcp_xml", {"path": str(xml), "mode": "into_open_project"}, "import")
+        call("import_fcp_xml", {"path": str(xml), "mode": "into_open_project"}, "import", required=True)
         # Premiere writes a "FCP Translation Results <date>.txt" (and pops a dialog) when it had to change
         # something on import — surface it instead of letting it hide in the bin
         for rep in sorted((Path.home() / "Documents").glob("FCP Translation Results*.txt")):
             if rep.stat().st_mtime >= t_import - 2:
                 text = rep.read_text(encoding="utf-8-sig", errors="replace").strip()
                 print(f"⚠️ Premiere translation report ({rep.name}):\n   " + text.replace("\n", "\n   "))
-        call("set_active_sequence", {"sequence_id": spec["name"]}, f"activate {spec['name']}")
+        call("set_active_sequence", {"sequence_id": spec["name"]}, f"activate {spec['name']}", required=True)
         long = [f"{k}{i + 1}" for k in ("video", "audio") for i, tr in enumerate(spec.get(k, [])) if len(tr) > CLIP_LIMIT]
         if long:
             print(f"⚠️ tracks with more than {CLIP_LIMIT} clips ({', '.join(long)}): effects past clip {CLIP_LIMIT} are not applied")
-        seq = json.loads(c.call("get_active_sequence", {"track_type": "video", "clip_limit": CLIP_LIMIT}))
-        seq = seq.get("data", seq)
+        seq = _data(c.call("get_active_sequence", {"track_type": "video", "clip_limit": CLIP_LIMIT}),
+                    "reading the new sequence")
         def node(ti, clip):  # by track + start: pieces of a razored clip share a name
             tracks = seq["videoTracks"]
             cands = [cl for cl in (tracks[ti]["clips"] if ti < len(tracks) else []) if cl.get("name") == clip.get("name")]
@@ -212,8 +236,8 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
         # API can't add effects to the Mix track, so it goes on every audio clip; QA then
         # checks the true peak of the whole render.
         if spec.get("limit_db") is not None:
-            aseq = json.loads(c.call("get_active_sequence", {"track_type": "audio", "clip_limit": CLIP_LIMIT}))
-            aseq = aseq.get("data", aseq)
+            aseq = _data(c.call("get_active_sequence", {"track_type": "audio", "clip_limit": CLIP_LIMIT}),
+                         "reading the audio tracks")
             for t_ in aseq.get("audioTracks", []):
                 for cl in t_["clips"]:
                     call("apply_audio_effect", {"node_id": cl["nodeId"], "effect_name": "Hard Limiter"},
@@ -232,7 +256,7 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
                  f"{tr['name']} @ {tr['t']} (V{tr.get('track', 0) + 1})")
         if replaces:
             call("delete_sequence", {"sequence_id": replaces}, f"delete {replaces}")
-            call("set_active_sequence", {"sequence_id": spec["name"]}, "re-activate")
+            call("set_active_sequence", {"sequence_id": spec["name"]}, "re-activate", required=True)
         call("save_project", {}, "save project")
         try:
             from .pull import make_snapshot, read_live, snapshot_path
@@ -249,9 +273,9 @@ def push(spec_path: str, export: str | None = None, keep_edits: bool = True, for
         if export:
             # Deleting a sequence can make Premiere switch timelines asynchronously;
             # confirm what is active right before rendering.
-            call("set_active_sequence", {"sequence_id": spec["name"]}, "activate for export")
-            active = json.loads(c.call("get_active_sequence", {"clip_limit": 1}))
-            active = active.get("data", active).get("name")
+            call("set_active_sequence", {"sequence_id": spec["name"]}, "activate for export", required=True)
+            active = _data(c.call("get_active_sequence", {"clip_limit": 1}), "checking the active sequence")
+            active = active.get("name") if isinstance(active, dict) else None
             if active != spec["name"]:
                 raise RuntimeError(f"refusing to export: active sequence is {active!r}")
             render(c, call, spec, export, direct=export_direct)

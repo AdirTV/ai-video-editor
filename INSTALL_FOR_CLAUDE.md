@@ -8,7 +8,7 @@ dump command output on them.
 - This needs **Claude Code with shell access** (the desktop app's Code tab or the `claude` CLI). If you are
   a chat-only Claude without a terminal, tell the user to open Claude Code and paste the link there.
 - Ask the user two questions: **where do they keep their editing projects?** (default: `~/Desktop/editing`
-  on Mac, `%USERPROFILE%\Desktop\editing` on Windows), and **which language their videos are in** —
+  on Mac, `Desktop\editing` on Windows — the real Desktop, which is often `OneDrive\Desktop`), and **which language their videos are in** —
   Hebrew (`he`), English (`en`) or mixed/other (`auto`, detected per video). If **Adobe Media Encoder** is installed (Mac: `ls -d "/Applications/Adobe Media Encoder"*`,
   Windows: `Test-Path "$env:ProgramFiles\Adobe\Adobe Media Encoder*"`), ask whether exports should render
   there — Premiere stays free during a render and an export crash can't take it (and unsaved work) down;
