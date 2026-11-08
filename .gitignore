@@ -4,7 +4,6 @@ node_modules/
 .DS_Store
 # personal: each person keeps their own
 style.md
-styles/
 vocab.txt
 brand.json
 # media and outputs never go in the repo
