@@ -100,6 +100,7 @@ Your personal files (`style.md`, `vocab.txt`, `brand.json`, `remotion/src/projec
 install turns into a git checkout on its first update. Claude also checks for updates when you start an edit.
 
 ## Licenses
+- The editor itself — all rights reserved (see `LICENSE`); no use or redistribution without permission
 - premiere-pro-mcp — MIT, by leancoderkavy (installed from npm, not included here)
 - Remotion — free for individuals and companies of up to 3 people; beyond that a license is required ([remotion.pro](https://remotion.pro))
 - Hebrew transcription model — [ivrit.ai](https://huggingface.co/ivrit-ai); Whisper — OpenAI (MIT)

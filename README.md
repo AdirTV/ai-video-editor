@@ -96,6 +96,7 @@ cd ~/ai-video-editor && uv run python setup/update.py
 העדכון מוריד את הגרסה החדשה ומתקין מחדש רק מה שהשתנה (חבילות, החיבור ל-Premiere, ה-skills). הקבצים האישיים שלך (`style.md`, `vocab.txt`, `brand.json`, הפרויקטים ב-`remotion/src/projects/`) לא נוגעים בהם. אם התקנת מ-ZIP, העדכון הראשון הופך את התיקייה לגרסה שמתעדכנת דרך git. Claude גם בודק לבד בתחילת עריכה אם יש עדכון ומציע להתקין.
 
 ## רישיונות
+- העורך עצמו — כל הזכויות שמורות (ראו `LICENSE`); אין להשתמש או להפיץ בלי אישור
 - premiere-pro-mcp — MIT, של leancoderkavy (מותקן מ-npm, לא כלול פה)
 - Remotion — חינמי לאנשים פרטיים ולחברות עד 3 עובדים; מעבר לזה צריך רישיון ([remotion.pro](https://remotion.pro))
 - מודל התמלול העברי — [ivrit.ai](https://huggingface.co/ivrit-ai)
