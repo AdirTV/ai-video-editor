@@ -22,6 +22,9 @@ style (formats, pacing, caption look, framing, music sources, everything they co
 learned-preferences section overrides every default in this skill. `brand.json` (same folder) is the channel
 name, colours, caption font/look and logo: the graphics fall back to it, so don't pass colours that just repeat
 it. When the user states brand colours or a logo, write them there.
+**Several creators or clients?** `style.md` can be an index into `{{MCE_HOME}}/styles/` (one file per creator or
+client, plus `common.md` for rules that hold for every edit). Then read the index, `common.md` and the file for
+whoever this video is for; if it isn't clear whose video it is, ask before editing.
 
 **Updates:** once per session, before the first edit, run `cd {{MCE_HOME}} && uv run python setup/update.py --check`
 (it only reads, never changes anything). If updates are waiting, tell the user in a line what's new and offer to
@@ -190,8 +193,10 @@ note with the clips/transitions/sounds under it. Act, re-push, and write lasting
 ## 8. Learn
 
 Every correction ("cut later", "keep the laugh", "music too loud", "captions in one line") → a dated line in
-style.md's learned-preferences section, so the next edit already follows it. Personal taste goes there, never
-into this skill: the skill is shared with every creator who installs the editor.
+style.md's learned-preferences section — or, when style.md is an index, at the end of that creator's file in
+`styles/` (a rule the user says holds for every edit, or the same correction for two creators → `common.md`) — so
+the next edit already follows it. A new rule that contradicts an old one replaces it instead of piling up. Personal
+taste goes there, never into this skill: the skill is shared with every creator who installs the editor.
 
 ## Sharing (repo upkeep)
 
