@@ -18,3 +18,13 @@ def fake_probe(monkeypatch):
         name = path.replace("\\", "/").rsplit("/", 1)[-1]
         return {"still": False, **FAKE_MEDIA[name]}
     monkeypatch.setattr(timeline_xml, "_probe", probe)
+
+
+def pytest_collection_modifyitems(config, items):
+    """slow / premiere tests run only when asked: plain `pytest` needs no model download and no Premiere."""
+    import os
+    gates = {"slow": "MCE_SLOW_TESTS", "premiere": "MCE_PREMIERE_TESTS"}
+    for item in items:
+        for mark, env in gates.items():
+            if mark in item.keywords and os.environ.get(env) != "1":
+                item.add_marker(pytest.mark.skip(reason=f"set {env}=1 to run"))

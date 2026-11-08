@@ -105,5 +105,7 @@ cd ~/ai-video-editor && uv run python setup/update.py
 ## בעיות נפוצות
 - **"heartbeat is stale"** — החלון של ה-MCP ב-Premiere סגור או תקוע: Window → Extensions → MCP for Adobe Premiere Pro.
 - **אחרי עדכון של premiere-pro-mcp העיצוב של החלון חזר לישן** — `bash panel/install.sh` (Mac) או להריץ שוב את `install-windows.bat` (Windows).
-- **Windows** — הכלים פותחו על Mac ומותאמים ל-Windows (נתיבים, עברית, קבצי ההגדרות), אבל נבדקים שם פחות. אם משהו נשבר — פתחו Issue ב-GitHub עם הודעת השגיאה, ובינתיים `uv run python setup/doctor.py` מראה מה חסר.
+- **Windows** — הכלים פותחו על Mac ומותאמים ל-Windows (נתיבים, עברית, קבצי ההגדרות), אבל נבדקים שם פחות. אם משהו נשבר — פתחו Issue ב-GitHub עם הודעת השגיאה ועם קובץ הלוג של ההתקנה (`%LOCALAPPDATA%\mce\logs`), ובינתיים `uv run python setup/doctor.py` מראה מה חסר.
+- **Windows: winget חסום או חסר** — המתקין מתקין רק את מה שחסר, ואם winget לא זמין הוא מדפיס לכל כלי קישור להתקנה הרשמית. מתקינים משם, פותחים חלון PowerShell חדש ומריצים שוב את המתקין. (סוכן AI שמריץ את המתקין בתוך sandbox נחסם לפעמים ב-winget — אז מריצים את המתקין בחלון PowerShell רגיל.)
+- **Windows: שולחן העבודה ב-OneDrive** — תיקיית ברירת המחדל היא `editing` על שולחן העבודה האמיתי (לרוב `OneDrive\Desktop`). פרויקטי וידאו גדולים ב-OneDrive יסונכרנו לענן; אפשר לבחור תיקייה אחרת בזמן ההתקנה או עם `-EditingRoot`.
 - **ההתקנה נעצרה באמצע** — מתקנים את מה שכתוב בהודעה ומריצים שוב את סקריפט ההתקנה. זה בטוח: מה שכבר הותקן לא נשבר וההגדרות נשמרות.
