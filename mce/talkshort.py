@@ -23,6 +23,9 @@ Config (JSON):
                                              # mid-sentence stops the build — choose a clean take instead
   "jcut": 0.1, "jcut_picture": 0.2,          # next sentence's sound starts early; its picture follows
   "captions": {"look": "karaoke" | "stream", "font": "carlito", "size": 84, "max_words": 6,
+               "comp": "Captions", "props": {}, "lower": false,
+                 # comp: another caption composition (an add-on's, e.g. "InfCaptions"); it gets caps (with
+                 # per-word "words" offsets and "big" emphasis words), seconds, top if set, plus "props" as-is
                "fix": {"gta": "GTA"}, "big": ["pyramids"], "hl": {"GTA": "#FFD84D"}, "mov": "graphics/caps v1.mov"},
                  # karaoke (clip-channel look): white 2-line phrases, upcoming words dimmed, on the seam
                  # over split shots and lower-middle over full-frame ones; stream: 1-line light blue groups
@@ -224,13 +227,16 @@ def captions(cuts: list[dict], cfg: dict, breaks: list[float] = ()) -> list[dict
     def flush():
         if group:
             caps.append({"start": round(group[0][1], 2), "end": round(group[-1][2] + 0.2, 2),
-                         "text": " ".join(g[0] for g in group)})
+                         "text": " ".join(g[0] for g in group),
+                         "words": [round(g[1] - group[0][1], 2) for g in group]})
             group.clear()
     for c in cuts:
         for wi, w in enumerate(c["words"]):
             raw = w["word"]
             txt = fix.get(_norm(raw), raw)
-            if wi == 0:  # a piece starts a sentence (also after a cut-out "so")
+            if cfg.get("lower"):  # the all-lowercase influencer look
+                txt = txt.lower()
+            elif wi == 0:  # a piece starts a sentence (also after a cut-out "so")
                 txt = txt[:1].upper() + txt[1:]
             ts = w["start"] - c["in"] + c["start"]
             te = min(w["end"], c["out"]) - c["in"] + c["start"]
@@ -249,6 +255,7 @@ def captions(cuts: list[dict], cfg: dict, breaks: list[float] = ()) -> list[dict
                     and not any(caps[-1]["start"] < b <= ts + 0.01 for b in breaks)):
                 # a short sentence-final word joins the group before it ("steps ahead of you.")
                 caps[-1]["text"] += " " + txt
+                caps[-1]["words"].append(round(ts - caps[-1]["start"], 2))
                 caps[-1]["end"] = round(te + 0.2, 2)
                 continue
             group.append((txt, ts, te))
@@ -586,22 +593,35 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
                 hl = lambda o: {**o.get("hl", {}), **c0.get("hl", {})}
                 if i and same(caps[i - 1], c0) and c0["start"] - caps[i - 1]["end"] < 0.1:
                     p = caps[i - 1]
-                    caps[i - 1] = {**p, "end": c0["end"], "text": p["text"] + " " + c0["text"], "hl": hl(p)}
+                    caps[i - 1] = {**p, "end": c0["end"], "text": p["text"] + " " + c0["text"], "hl": hl(p),
+                                   "words": p["words"] + [round(x + c0["start"] - p["start"], 2) for x in c0["words"]]}
                     caps.pop(i)
                     continue
                 if i + 1 < len(caps) and caps[i + 1]["start"] - c0["end"] < 0.1:
                     nx = caps.pop(i + 1)
                     caps[i] = {**nx, "start": c0["start"], "text": c0["text"] + " " + nx["text"], "hl": hl(nx),
-                               "_tl": nx["start"]}
+                               "_tl": nx["start"],
+                               "words": c0["words"] + [round(x + nx["start"] - c0["start"], 2) for x in nx["words"]]}
             i += 1
+        comp = cc.get("comp", "Captions")
+        big = {_norm(w) for w in cc.get("big", [])}
         for c_ in caps:
             if not c_.get("hl"):
                 c_.pop("hl", None)
+            bw = [w for w in c_["text"].split() if _norm(w) in big]
+            if bw:
+                c_["big"] = bw  # emphasis words (an add-on caption comp draws them large)
+            if comp == "Captions":
+                c_.pop("words", None)  # the shared look shows the group at once
         if cc.get("follow_layout", True) and split:
             for cp in caps:
                 cp["top"] = seam_top if on_split(cp.pop("_tl", cp["start"]) + 0.02) else top
         props = {"caps": caps, "top": top, "size": size, "seconds": round(end, 2),
                  "font": cc.get("font", "carlito"), "look": look}
+        if comp != "Captions":  # an add-on's caption composition: pass its own props through
+            props = {"caps": caps, "seconds": round(end, 2), **{k: v for k, v in cc.get("props", {}).items()}}
+            if "top" in cc:
+                props["top"] = top
     video = [v_face, v_broll]
     mov = cc.get("mov")
     if mov and Path(rel(mov)).exists():
@@ -632,8 +652,8 @@ def build(cfg: dict, base: Path) -> tuple[dict, dict, list[str]]:
     return spec, props, report
 
 
-def render_captions(props_path: Path, out_dir: Path, stem: str) -> Path:
-    """Render the Remotion Captions composition (transparent ProRes) to a new file."""
+def render_captions(props_path: Path, out_dir: Path, stem: str, comp: str = "Captions") -> Path:
+    """Render a Remotion caption composition (transparent ProRes) to a new file."""
     import shutil
     import time
 
@@ -642,7 +662,7 @@ def render_captions(props_path: Path, out_dir: Path, stem: str) -> Path:
     out = out_dir / f"caps {stem} {time.strftime('%m%d-%H%M%S')}.mov"
     npx = shutil.which("npx") or shutil.which("npx.cmd") or "npx"
     print(f"rendering captions → {out}")
-    r = subprocess.run([npx, "remotion", "render", "Captions", str(out), f"--props={props_path}"],
+    r = subprocess.run([npx, "remotion", "render", comp, str(out), f"--props={props_path}"],
                        cwd=MCE_HOME / "remotion")
     if r.returncode or not out.exists():
         raise SystemExit("❌ caption render failed (see the Remotion output above)")
@@ -661,7 +681,8 @@ def main() -> None:
     props_path = cfgp.parent / "caps_props.json"
     props_path.write_text(json.dumps(props, ensure_ascii=False, indent=1), encoding="utf-8")
     if a.render:
-        mov = render_captions(props_path, cfgp.parent / "graphics", cfgp.stem)
+        mov = render_captions(props_path, cfgp.parent / "graphics", cfgp.stem,
+                              cfg.get("captions", {}).get("comp", "Captions"))
         cfg.setdefault("captions", {})["mov"] = str(mov)
         cfgp.write_text(json.dumps(cfg, ensure_ascii=False, indent=1), encoding="utf-8")
         spec, props, report = build(cfg, cfgp.parent)

@@ -21,7 +21,8 @@ public/
   projects/<name>/ media for your own projects (local)
 ```
 
-Render (transparent ProRes 4444 is the default in `remotion.config.ts` — no extra flags, just a `.mov`):
+Render — the output extension picks the format in `remotion.config.ts`, no extra flags: `.mov` → transparent
+ProRes 4444 (overlays for Premiere), `.webm` → transparent VP9, `.mp4` → opaque H.264 (full-frame videos):
 
 ```console
 npx remotion render <Comp> out.mov --props='<json>'

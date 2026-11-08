@@ -160,6 +160,9 @@ def build(spec: dict) -> str:
                     # short fades relative to gain_db (jump-cut crossfades); -40 dB = silent
                     g, ln = c.get("gain_db", 0), (c["out"] - c["in"]) / speed
                     fi, fo = c.get("fade_in", 0), c.get("fade_out", 0)
+                    # a fade shorter than a frame would put its -40 dB key and the full-level key on the same
+                    # frame: Premiere then ramps the whole clip up from near-silence ("starts weak, then rises")
+                    fi, fo = (f if f * cf >= 1 else 0 for f in (fi, fo))
                     pts = ([(0, g - 40), (fi, g)] if fi else [(0, g)]) + \
                           ([(ln - fo, g), (ln, g - 40)] if fo else [(ln, g)])
                     keys = [(c_in + round(t * cf), d) for t, d in pts]

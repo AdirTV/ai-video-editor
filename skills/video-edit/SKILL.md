@@ -127,8 +127,8 @@ sequence without pushing: `uv run python -m mce.export <out.mp4> [--sequence NAM
 - **Captions / graphics**: Remotion (`remotion/`). **`remotion/CATALOG.md` lists every shared composition with a
   still, its props (types, required, notes) and a ready render command — read it before picking or rendering one.**
   The props are zod schemas in `remotion/src/schemas.ts`; bad `--props` fail fast with the field name.
-  Render: `npx remotion render <Comp> out.mov --props='<json>'` — transparent ProRes 4444 is the default, no
-  flags needed. Everything renders at 60 fps; `REMOTION_FPS=30 npx remotion render …` for a 30 fps edit.
+  Render: `npx remotion render <Comp> out.mov --props='<json>'` — the extension picks the format, no flags needed:
+  `.mov` = transparent ProRes 4444 (overlays), `.webm` = transparent VP9, `.mp4` = opaque H.264 (full-frame pieces). Everything renders at 60 fps; `REMOTION_FPS=30 npx remotion render …` for a 30 fps edit.
   Give re-renders NEW filenames (Premiere caches by path). Premiere SRT captions: avoid (small, RTL number bugs).
   Layout: shared components by role in `src/{captions,text,promo,fx,stream}/` (add-ons register more); a graphic made for ONE
   video goes in `src/projects/<name>/index.tsx` (exports `Compositions`, auto-loaded) with media in

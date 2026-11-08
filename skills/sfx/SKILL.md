@@ -27,6 +27,13 @@ Commands (from `{{MCE_HOME}}`):
 - `uv run python -m mce.sfx search rabbit hurt` — find specific sounds (all words must appear in the path).
   Use it for content-matched hits: a rabbit sound when a rabbit appears, "levelup" on an achievement,
   zombie groan for a zombie. Put the chosen file as an explicit hit (see below, `"file"` key) .
+- `uv run python -m mce.sfx loop <file> <seconds> [--out x.wav] [--start s --end s]` — **the only way to
+  loop a sound** (a bed under a whole short, "put X in a loop"). Effect files have a silent lead-in and a
+  decaying tail; repeating the file, or a range read off a coarse loudness list, puts a fade + silence at
+  every repeat and it sounds like the effect restarting, not a loop. This keeps only the sustained body,
+  crossfades the repeats, writes one WAV for the whole length and prints the deepest dip — 🔴 means pick
+  `--start/--end` inside the sustained part. Put the WAV on the timeline as ONE clip. When the user names a
+  part of the sound ("from the second part"), ask for seconds in the file instead of guessing.
 - `uv run python -m mce.sfx starter` — rebuild the curated kit from the packs (only if the user asks; it
   replaces what they curated — never run it over their own picks without asking).
 

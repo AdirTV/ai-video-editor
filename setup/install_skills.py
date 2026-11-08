@@ -39,3 +39,18 @@ for src in sorted((REPO / "skills").iterdir()) + skill_dirs():
 for pub in sorted(PLUGINS_DIR.glob("*/public")):
     shutil.copytree(pub, REPO / "remotion" / "public", dirs_exist_ok=True)
     print("copied assets:", pub.parent.name)
+
+# An add-on can ship the starting style.md for its kind of video (plugins/<name>/style.template[.en].md).
+# It replaces style.md only while that is still the editor's untouched template — never a file someone edited.
+core = {p.read_text(encoding="utf-8") for p in REPO.glob("style.template*.md")}
+style = REPO / "style.md"
+if not style.exists() or style.read_text(encoding="utf-8") in core:
+    en = style.exists() and style.read_text(encoding="utf-8") == (REPO / "style.template.en.md").read_text(encoding="utf-8")
+    for plug in sorted(PLUGINS_DIR.iterdir()) if PLUGINS_DIR.exists() else []:
+        tpl = plug / ("style.template.en.md" if en else "style.template.md")
+        if not tpl.exists():
+            tpl = plug / "style.template.md"
+        if tpl.exists():
+            style.write_text(tpl.read_text(encoding="utf-8"), encoding="utf-8")
+            print(f"style.md: started from the {plug.name} add-on's template")
+            break

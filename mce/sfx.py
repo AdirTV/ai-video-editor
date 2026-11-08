@@ -261,6 +261,76 @@ def typing_track(duration: float, lib: Path = LIB, seed: int = 0, rate: float = 
             **{k: v for k, v in _analyze(path).items() if k == "loudness"}}
 
 
+def loop_body(x: np.ndarray, sr: int, drop_db: float = 10.0, win: float = 0.02) -> tuple[int, int]:
+    """Sample range of a sound's sustained body: skips the silence before it and the decaying tail after it.
+    A window counts as body while it is within drop_db of the sound's typical (median) loud level."""
+    mono = x.mean(axis=1) if x.ndim == 2 else x
+    n = max(1, int(win * sr))
+    frames = len(mono) // n
+    if frames < 3:
+        return 0, len(mono)
+    rms = np.sqrt((mono[: frames * n].reshape(frames, n) ** 2).mean(axis=1)) + 1e-9
+    db = 20 * np.log10(rms)
+    loud = db[db > db.max() - 40]
+    floor = np.median(loud) - drop_db
+    body = np.where(db >= floor)[0]
+    return int(body[0] * n), int((body[-1] + 1) * n)
+
+
+def seam_dips(x: np.ndarray, sr: int, win: float = 0.02) -> float:
+    """Deepest drop (dB) of any short window below the loop's median level — a gap a listener hears as the
+    loop restarting. A seamless loop stays within a few dB."""
+    mono = x.mean(axis=1) if x.ndim == 2 else x
+    n = int(win * sr)
+    frames = len(mono) // n
+    db = 20 * np.log10(np.sqrt((mono[: frames * n].reshape(frames, n) ** 2).mean(axis=1)) + 1e-9)
+    edge = max(1, int(0.3 / win))  # the loop's own fade-in/out at the ends doesn't count
+    inner = db[edge:-edge] if len(db) > 2 * edge + 1 else db
+    return float(np.median(inner) - inner.min())
+
+
+def make_loop(src: str | Path, duration: float, out: str | Path | None = None, xfade: float = 0.08,
+              start: float | None = None, end: float | None = None, lib: Path = LIB) -> dict:
+    """A seamless loop of a sound for `duration` seconds, as one WAV.
+
+    Looping a whole effect file (or a range read off a coarse loudness list) repeats its silent lead-in and
+    its decaying tail, so every repeat audibly stops and restarts. This keeps only the sustained body
+    (or the given start/end seconds), joins the repeats with equal-power crossfades and reports the deepest
+    level dip, so the seam can be checked before it goes on a timeline."""
+    import wave
+
+    sr = 48000
+    raw, _ = ff.run(["ffmpeg", "-v", "error", "-i", src, "-ac", "2", "-ar", str(sr), "-f", "s16le", "-"], binary=True)
+    x = np.frombuffer(raw, np.int16).astype(np.float32).reshape(-1, 2) / 32768
+    a, b = loop_body(x, sr)
+    if start is not None:
+        a = int(start * sr)
+    if end is not None:
+        b = int(end * sr)
+    body = x[a:b]
+    xf = min(int(xfade * sr), len(body) // 3)
+    need = int(duration * sr)
+    t = np.linspace(0, np.pi / 2, xf)[:, None]
+    fade_in, fade_out = np.sin(t), np.cos(t)
+    outbuf = body.copy()
+    while len(outbuf) < need + xf:
+        head = outbuf[-xf:] * fade_out + body[:xf] * fade_in
+        outbuf = np.concatenate([outbuf[:-xf], head, body[xf:]])
+    outbuf = outbuf[:need]
+    dip = seam_dips(outbuf, sr)
+    if out is None:
+        gen = lib / "_generated"
+        gen.mkdir(exist_ok=True)
+        out = gen / f"loop_{Path(src).stem}_{duration:.2f}s.wav"
+    with wave.open(str(out), "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes((np.clip(outbuf, -1, 1) * 32767).astype(np.int16).tobytes())
+    return {"path": str(out), "body": [round(a / sr, 3), round(b / sr, 3)], "seam_dip_db": round(dip, 1),
+            "duration": round(len(outbuf) / sr, 3)}
+
+
 class _Picker:
     """Rotate through a category so consecutive hits don't repeat one sound."""
 
@@ -386,7 +456,20 @@ def main() -> None:
     pl = sub.add_parser("plan")
     pl.add_argument("spec")
     pl.add_argument("--lib", default=str(LIB))
+    lo = sub.add_parser("loop", help="seamless loop of a sound (body only, crossfaded) as one WAV")
+    lo.add_argument("file")
+    lo.add_argument("seconds", type=float)
+    lo.add_argument("--out")
+    lo.add_argument("--start", type=float, help="body start in the file (default: found automatically)")
+    lo.add_argument("--end", type=float, help="body end in the file (default: found automatically)")
+    lo.add_argument("--xfade", type=float, default=0.08)
     a = p.parse_args()
+    if a.cmd == "loop":
+        r = make_loop(a.file, a.seconds, a.out, a.xfade, a.start, a.end)
+        flag = "✅" if r["seam_dip_db"] <= 9 else "🔴 audible gap — pick --start/--end inside the sustained part"
+        print(f"{r['path']}\n  body {r['body'][0]}–{r['body'][1]}s of the file, deepest dip "
+              f"{r['seam_dip_db']} dB {flag}")
+        return
     if a.cmd == "index":
         index(Path(a.lib))
     elif a.cmd == "starter":

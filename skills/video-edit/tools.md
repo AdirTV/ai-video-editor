@@ -67,6 +67,17 @@ matte instead (Premiere Track Matte Key).
 - Check the cutout on a coloured background before using it (edges, lost hands/hair, a second person grabbed);
   add `--point`/`--neg` and rerun if wrong.
 
+## Slow motion — `mce.slowmo <video> --start S --end E [--factor 2|4|8] [--fps-out N] [-o out.mov]`
+
+RIFE frame interpolation (rife-v4.6): real in-between frames, so slow-mo doesn't stutter or ghost — cleaner than
+Premiere's Optical Flow (no warping on the HUD/edges) and far better than frame blending. Default: slow-mo clip at
+the source fps, duration × factor — use it for a clutch moment, a near-death, a slow-mo reveal before the punchline.
+`--fps-out 60` instead keeps real-time duration at a higher rate: make 60 fps copies of 30 fps footage for speed
+ramps, then ramp in Premiere (each real frame is used, nothing is invented by Premiere). ProRes 422 HQ, video only
+(keep the source audio or add a whoosh/bass drop), starting at S. ~15 output frames/s at 1080p, ~7 at
+3840x1080 (2 s of 1080p30 x4 ≈ 20 s) → only the seconds you need. Look at the slow part before using it: fast
+camera spins and things popping in/out of frame can smear.
+
 ## Lottie animations — Remotion `LottieFx`
 
 Ready-made animated stickers/icons with alpha:

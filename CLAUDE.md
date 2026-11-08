@@ -15,3 +15,5 @@
   `brand.example.json` are the shared starts.
 - Add-ons (`plugins/<name>/`, gitignored, each its own repo) extend the editor for one kind of video — see
   `plugins/README.md`. Keep this repo general: anything specific to one game or format belongs in an add-on.
+- Helping one creator or one kind of creator (a style, a caption look, a graphic only they need)? It goes in their
+  `style.md` / `brand.json` or in an add-on — never in this repo's `mce/`, `remotion/src/` or `skills/`, which every user gets.
